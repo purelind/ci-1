@@ -5,7 +5,7 @@ WORKDIR /root
 
 RUN yum remove git -y \
        && curl https://setup.ius.io | sh \
-       && yum install -y git222
+       && yum install -y git222 python-pip
 
 ENV GOLANG_VERSION 1.16.4
 ENV GOLANG_DOWNLOAD_URL https://dl.google.com/go/go$GOLANG_VERSION.linux-amd64.tar.gz
