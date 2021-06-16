@@ -577,14 +577,14 @@ stage("upload status"){
 if (params.containsKey("triggered_by_upstream_ci")) {
     stage("update commit status") {
         node("master") {
-            if (currentBuild.result = "ABORTED") {
+            if (currentBuild.result == "ABORTED") {
                 PARAM_DESCRIPTION = 'Jenkins job aborted'
                 // Commit state. Possible values are 'pending', 'success', 'error' or 'failure'
                 PARAM_STATUS = 'error'
-            } else if (currentBuild.result = "FAILURE") {
+            } else if (currentBuild.result == "FAILURE") {
                 PARAM_DESCRIPTION = 'Jenkins job failed'
                 PARAM_STATUS = 'failure'
-            } else if (currentBuild.result = "SUCCESS") {
+            } else if (currentBuild.result == "SUCCESS") {
                 PARAM_DESCRIPTION = 'Jenkins job success'
                 PARAM_STATUS = 'success'
             } else {
