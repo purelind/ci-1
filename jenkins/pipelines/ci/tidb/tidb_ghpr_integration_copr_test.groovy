@@ -77,11 +77,11 @@ try {
                 }
             }
         }
-
-        if (notRun == 0){
-            println "the ${ghprbActualCommit} has been tested"
-            throw new RuntimeException("hasBeenTested")
-        }
+//        temp disable notRun. run test even commit already test before
+//        if (notRun == 0){
+//            println "the ${ghprbActualCommit} has been tested"
+//            throw new RuntimeException("hasBeenTested")
+//        }
     }
 
     node("${GO_TEST_SLAVE}") {
