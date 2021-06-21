@@ -1,13 +1,33 @@
 echo "Job start"
 
-//def ciRepeUrl = "https://github.com/PingCAP-QE/ci.git"
-//def ciRepoBranch = "main"
-def ciRepeUrl = "https://github.com/purelind/ci.git"
-def ciRepoBranch = "patch-ticdc-init"
+def ciRepeUrl = "https://github.com/PingCAP-QE/ci.git"
+def ciRepoBranch = "main"
+
 def specStr = "+refs/pull/${ghprbPullId}/*:refs/remotes/origin/pr/${ghprbPullId}/*"
 if (ghprbPullId == null || ghprbPullId == "") {
     specStr = "+refs/heads/*:refs/remotes/origin/*"
 }
+
+def boolean isBranchMatched(List<String> branches, String targetBranch) {
+    for (String item : branches) {
+        if (targetBranch.startsWith(item)) {
+            println "targetBranch=${targetBranch} matched in ${branches}"
+            return true
+        }
+    }
+    return false
+}
+
+def isNeedGo1160 = isBranchMatched(["master", "release-5.1"], ghprbTargetBranch)
+if (isNeedGo1160) {
+    println "This build use go1.16"
+    GO_BUILD_SLAVE = GO1160_BUILD_SLAVE
+    GO_TEST_SLAVE = GO1160_TEST_SLAVE
+} else {
+    println "This build use go1.13"
+}
+println "BUILD_NODE_NAME=${GO_BUILD_SLAVE}"
+println "TEST_NODE_NAME=${GO_TEST_SLAVE}"
 
 catchError {
     node ("${GO_TEST_SLAVE}") {
@@ -35,9 +55,9 @@ catchError {
                 sh "git checkout -f ${ghprbActualCommit}"
             }
 
-            dir("/home/jenkins/agent/git/ci") {
+            dir("${ws}/go/src/github.com/pingcap/ci") {
                 if (sh(returnStatus: true, script: '[ -d .git ] && git rev-parse --git-dir > /dev/null 2>&1') != 0) {
-                    echo "Not a valid git folder: /home/jenkins/agent/git/ci"
+                    echo "Not a valid git folder: ${ws}/go/src/github.com/pingcap/ci"
                     deleteDir()
                 }
                 try {
@@ -47,7 +67,7 @@ catchError {
                         echo "checkout failed, retry.."
                         sleep 5
                         if (sh(returnStatus: true, script: '[ -d .git ] && git rev-parse --git-dir > /dev/null 2>&1') != 0) {
-                            echo "Not a valid git folder: /home/jenkins/agent/git/ci"
+                            echo "Not a valid git folder: ${ws}/go/src/github.com/pingcap/ci"
                             deleteDir()
                         }
                         checkout changelog: false, poll: false, scm: [$class: 'GitSCM', branches: [[name: "${ciRepoBranch}"]], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'PruneStaleBranch'], [$class: 'CleanBeforeCheckout']], submoduleCfg: [], userRemoteConfigs: [[refspec: specStr, url: "${ciRepeUrl}"]]]

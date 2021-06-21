@@ -15,7 +15,7 @@ def TIKV_BRANCH = ghprbTargetBranch
 def PD_BRANCH = ghprbTargetBranch
 def TIDB_TEST_BRANCH = ghprbTargetBranch
 
-if (params.containsKey("release_test")) {
+if (params.containsKey("release_test") && params.triggered_by_upstream_ci == null) {
     TIKV_BRANCH = params.release_test__tikv_commit
     PD_BRANCH = params.release_test__pd_commit
 }
@@ -51,6 +51,27 @@ def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${ghprbActual
 def tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${ghprbActualCommit}/centos7/done"
 def testStartTimeMillis = System.currentTimeMillis()
 
+def boolean isBranchMatched(List<String> branches, String targetBranch) {
+    for (String item : branches) {
+        if (targetBranch.startsWith(item)) {
+            println "targetBranch=${targetBranch} matched in ${branches}"
+            return true
+        }
+    }
+    return false
+}
+
+def isNeedGo1160 = isBranchMatched(["master", "release-5.1"], ghprbTargetBranch)
+if (isNeedGo1160) {
+    println "This build use go1.16"
+    GO_BUILD_SLAVE = GO1160_BUILD_SLAVE
+    GO_TEST_SLAVE = GO1160_TEST_SLAVE
+} else {
+    println "This build use go1.13"
+}
+println "BUILD_NODE_NAME=${GO_BUILD_SLAVE}"
+println "TEST_NODE_NAME=${GO_TEST_SLAVE}"
+
 try {
     timestamps {
         stage("Pre-check"){
@@ -71,7 +92,7 @@ try {
         }
 
         def buildSlave = "${GO_BUILD_SLAVE}"
-        def testSlave = "test_go"
+        def testSlave = "${GO_TEST_SLAVE}"
 
         stage('Prepare') {
             def prepareStartTime = System.currentTimeMillis()
@@ -427,81 +448,6 @@ try {
                 run("mysql_test", "mysqltest", "CACHE_ENABLED=1 ./test.sh")
             }
 
-            tests["Integration Connection Test"] = {
-                node(testSlave) {
-                    def ws = pwd()
-                    def mytest = "connectiontest"
-                    deleteDir()
-                    unstash "tidb-test"
-
-                    dir("go/src/github.com/pingcap/tidb") {
-                        container("golang") {
-
-                            timeout(10) {
-                                retry(3){
-                                    deleteDir()
-                                    sh """
-	                            tikv_sha1=`curl "${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1"`
-	                            tikv_url="${FILE_SERVER_URL}/download/builds/pingcap/tikv/\${tikv_sha1}/centos7/tikv-server.tar.gz"
-	
-	                            pd_sha1=`curl "${FILE_SERVER_URL}/download/refs/pingcap/pd/${PD_BRANCH}/sha1"`
-	                            pd_url="${FILE_SERVER_URL}/download/builds/pingcap/pd/\${pd_sha1}/centos7/pd-server.tar.gz"
-	
-	
-	                            while ! curl --output /dev/null --silent --head --fail \${tikv_url}; do sleep 1; done
-	                            curl \${tikv_url} | tar xz
-	
-	                            while ! curl --output /dev/null --silent --head --fail \${pd_url}; do sleep 1; done
-	                            curl \${pd_url} | tar xz bin/pd-server
-	
-	                            while ! curl --output /dev/null --silent --head --fail ${tidb_done_url}; do sleep 1; done
-	                            curl ${tidb_url} | tar xz
-	                            """
-                                }
-                            }
-
-                            try {
-                                timeout(10) {
-                                    sh """
-                                set +e
-                                killall -9 -r tidb-server
-                                killall -9 -r tikv-server
-                                killall -9 -r pd-server
-                                rm -rf /tmp/tidb
-                                rm -rf ./tikv ./pd
-                                set -e
-
-                                bin/pd-server --name=pd --data-dir=pd &>pd_${mytest}.log &
-                                sleep 10
-                                echo '[storage]\nreserve-space = "0MB"'> tikv_config.toml
-                                bin/tikv-server -C tikv_config.toml --pd=127.0.0.1:2379 -s tikv --addr=0.0.0.0:20160 --advertise-addr=127.0.0.1:20160 &>tikv_${mytest}.log &
-                                sleep 10
-
-                                CGO_ENABLED=1 make tikv_integration_test 2>&1
-                                """
-                                }
-                            } catch (err) {
-                                sh """
-                            cat pd_${mytest}.log
-                            cat tikv_${mytest}.log
-                            cat tidb*.log
-                            """
-                                throw err
-                            } finally {
-                                sh """
-                            set +e
-                            killall -9 -r tidb-server
-                            killall -9 -r tikv-server
-                            killall -9 -r pd-server
-                            set -e
-                            """
-                            }
-                        }
-                    }
-                    deleteDir()
-                }
-            }
-
             tests["Integration Explain Test"] = {
                 node (testSlave) {
                     def ws = pwd()
@@ -623,7 +569,37 @@ finally {
 }
 
 stage("upload status"){
-    node{
+    node("master") {
         sh """curl --connect-timeout 2 --max-time 4 -d '{"job":"$JOB_NAME","id":$BUILD_NUMBER}' http://172.16.5.25:36000/api/v1/ci/job/sync || true"""
+    }
+}
+
+if (params.containsKey("triggered_by_upstream_ci")) {
+    stage("update commit status") {
+        node("master") {
+            if (currentBuild.result == "ABORTED") {
+                PARAM_DESCRIPTION = 'Jenkins job aborted'
+                // Commit state. Possible values are 'pending', 'success', 'error' or 'failure'
+                PARAM_STATUS = 'error'
+            } else if (currentBuild.result == "FAILURE") {
+                PARAM_DESCRIPTION = 'Jenkins job failed'
+                PARAM_STATUS = 'failure'
+            } else if (currentBuild.result == "SUCCESS") {
+                PARAM_DESCRIPTION = 'Jenkins job success'
+                PARAM_STATUS = 'success'
+            } else {
+                PARAM_DESCRIPTION = 'Jenkins job meets something wrong'
+                PARAM_STATUS = 'error'
+            }
+            def default_params = [
+                    string(name: 'TIDB_COMMIT_ID', value: ghprbActualCommit ),
+                    string(name: 'CONTEXT', value: 'idc-jenkins-ci-tidb/integration-common-test'),
+                    string(name: 'DESCRIPTION', value: PARAM_DESCRIPTION ),
+                    string(name: 'BUILD_URL', value: RUN_DISPLAY_URL ),
+                    string(name: 'STATUS', value: PARAM_STATUS ),
+            ]
+            echo("default params: ${default_params}")
+            build(job: "tidb_update_commit_status", parameters: default_params, wait: true)
+        }
     }
 }

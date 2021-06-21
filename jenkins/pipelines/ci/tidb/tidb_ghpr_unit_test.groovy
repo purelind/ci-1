@@ -38,6 +38,30 @@ if (params.containsKey("release_test")) {
     specStr = "+refs/heads/*:refs/remotes/origin/*"
 }
 
+def boolean isBranchMatched(List<String> branches, String targetBranch) {
+    for (String item : branches) {
+        if (targetBranch.startsWith(item)) {
+            println "targetBranch=${targetBranch} matched in ${branches}"
+            return true
+        }
+    }
+    return false
+}
+
+println "$GO1160_BUILD_SLAVE"
+println "$GO1160_TEST_SLAVE"
+
+def isNeedGo1160 = isBranchMatched(["master", "release-5.1"], ghprbTargetBranch)
+if (isNeedGo1160) {
+    println "This build use go1.16"
+    GO_BUILD_SLAVE = GO1160_BUILD_SLAVE
+    GO_TEST_SLAVE = GO1160_TEST_SLAVE
+} else {
+    println "This build use go1.13"
+}
+println "BUILD_NODE_NAME=${GO_BUILD_SLAVE}"
+println "TEST_NODE_NAME=${GO_TEST_SLAVE}"
+
 try {
     timestamps {
         stage("Pre-check"){
@@ -141,27 +165,11 @@ try {
                             grep  "\${package_base}/expression/" packages.list >> packages.list.short
                             echo  "\${package_base}/expression" > packages_race_12
                             grep "\${package_base}/planner/core" packages.list.short > packages_race_6
-                            grep "\${package_base}/store/tikv" packages.list.short > packages_race_5
+                            grep "\${package_base}/store/tikv" packages.list.short > packages_race_5 | true #store/tikv is removed from master
                             grep "\${package_base}/server" packages.list.short > packages_race_4
 
                             cat packages.list.short | grep -v "\${package_base}/planner/core" | grep -v "\${package_base}/store/tikv" | grep -v "\${package_base}/server" > packages.list.short.1
                             mv packages.list.short.1 packages.list.short
-
-                            cat packages.list | grep -v "\${package_base}/planner/core" | grep -v "\${package_base}/server" | grep -v "\${package_base}/ddl" | grep -v "\${package_base}/executor" > packages.list.unit.leak
-
-                            split packages.list.unit.leak -n r/3 packages_unit_ -a 1 --numeric-suffixes=1
-                            cat packages.list | grep "\${package_base}/ddl" > packages_unit_4
-                            echo "\${package_base}/executor" > packages_unit_5
-                            cat packages.list | grep "\${package_base}/planner/core" > packages_unit_6
-                            cat packages.list | grep "\${package_base}/server" > packages_unit_7
-                            cat packages.list | grep "\${package_base}/executor/" > packages_unit_8
-
-                            split packages.list.unit.leak -n r/3 packages_leak_ -a 1 --numeric-suffixes=1
-                            cat packages.list | grep "\${package_base}/ddl" > packages_leak_4
-                            echo "\${package_base}/executor" > packages_leak_5
-                            cat packages.list | grep "\${package_base}/planner/core" > packages_leak_6
-                            cat packages.list | grep "\${package_base}/server" > packages_leak_7
-                            cat packages.list | grep "\${package_base}/executor/" > packages_leak_8
 
                             split packages.list.short -n r/3 packages_race_ -a 1 --numeric-suffixes=1
 
@@ -194,44 +202,6 @@ try {
         }
 
         stage('Unit Test') {
-            def run_unit_test = { chunk_suffix ->
-                node(testSlave) {
-                    def ws = pwd()
-                    deleteDir()
-                    println "debug command:\nkubectl -n jenkins-ci exec -ti ${NODE_NAME} bash"
-
-                    unstash 'tidb'
-
-                    dir("go/src/github.com/pingcap/tidb") {
-                        container("golang") {
-                            try{
-                                timeout(10) {
-                                    sh """
-                                set +e
-                                killall -9 -r -q tidb-server
-                                killall -9 -r -q tikv-server
-                                killall -9 -r -q pd-server
-                                rm -rf /tmp/tidb
-                                set -e
-                                export log_level=info 
-                                time ${goTestEnv} go test -timeout 10m -v -p 5 -ldflags '-X "github.com/pingcap/tidb/config.checkBeforeDropLDFlag=1"' -cover \$(cat packages_unit_${chunk_suffix}) #  > test.log
-                                """
-                                }
-                            }catch (err) {
-                                throw err
-                            }finally {
-                                // sh"""
-                                // cat test.log
-                                // go get github.com/tebeka/go2xunit
-                                // cat test.log | go2xunit > junit.xml
-                                // """
-                                // junit "junit.xml"
-                            }
-                        }
-                    }
-                }
-            }
-
             def run_race_test = { chunk_suffix ->
                 node(testSlave) {
                     def ws = pwd()
@@ -251,8 +221,10 @@ try {
                                 killall -9 -r pd-server
                                 rm -rf /tmp/tidb
                                 set -e
+                                set -o pipefail
                                 export log_level=info
-                                time ${goTestEnv} go test -v -vet=off -p 5 -timeout 20m -race \$(cat packages_race_${chunk_suffix}) #> test.log
+                                if [ -s packages_race_${chunk_suffix} ]; then time ${goTestEnv} go test -v -vet=off -p 5 -timeout 20m -race \$(cat packages_race_${chunk_suffix}); fi | tee test.log || \\
+                                (cat test.log | grep -Ev "^\\[[[:digit:]]{4}(/[[:digit:]]{2}){2}" | grep -A 30 "\\-------" | grep -A 29 "^FAIL:"; false)
                                 """
                                 }
                             }catch (err) {
@@ -290,8 +262,10 @@ try {
                                 killall -9 -r pd-server
                                 rm -rf /tmp/tidb
                                 set -e
+                                set -o pipefail
                                 export log_level=info
-                                time GORACE="history_size=7" ${goTestEnv} go test -v -vet=off -p 5 -timeout 20m -race \$(cat packages_race_${chunk_suffix}) ${extraArgs} # > test.log
+                                if [ -s packages_race_${chunk_suffix} ]; then time GORACE="history_size=7" ${goTestEnv} go test -v -vet=off -p 5 -timeout 20m -race \$(cat packages_race_${chunk_suffix}) ${extraArgs}; fi | tee test.log || \\
+                                (cat test.log | grep -Ev "^\\[[[:digit:]]{4}(/[[:digit:]]{2}){2}" | grep -A 30 "\\-------" | grep -A 29 "^FAIL:"; false)
                                 """
                                 }
                             }catch (err) {
@@ -317,77 +291,56 @@ try {
                 run_race_test_heavy_with_args(chunk_suffix, "-check.p")
             }
 
-            def run_leak_test = { chunk_suffix ->
-                node(testSlave) {
-                    def ws = pwd()
-                    deleteDir()
-                    println "debug command:\nkubectl -n jenkins-ci exec -ti ${NODE_NAME} bash"
-
-                    unstash 'tidb'
-
-                    dir("go/src/github.com/pingcap/tidb") {
-                        container("golang") {
-                            try{
-                                timeout(20) {
-                                    sh """
-                                set +e
-                                killall -9 -r tidb-server
-                                killall -9 -r tikv-server
-                                killall -9 -r pd-server
-                                rm -rf /tmp/tidb
-                                set -e
-                                export log_level=info 
-                                time ${goTestEnv} CGO_ENABLED=1 go test -v -p 5 -tags leak \$(cat packages_leak_${chunk_suffix}) # > test.log
-                                """
-                                }
-                            }catch (err) {
-                                throw err
-                            }finally {
-                                // sh"""
-                                // cat test.log
-                                // go get github.com/tebeka/go2xunit
-                                // cat test.log | go2xunit > junit.xml
-                                // """
-                                // junit "junit.xml"
-                            }
-                        }
-                    }
-                }
-            }
 
             // 将执行较慢的 chunk 放在前面优先调度，以减轻调度的延迟对执行时间的影响
             def tests = [:]
 
-            tests["Race Test Chunk #9 executor"] = {
-                run_race_test_heavy(9)
+            def suites = """testSuite1|testSuite|testSuite7|testSuite5|testSuiteAgg|
+                            testSuiteJoin1|tiflashTestSuite|testFastAnalyze|testSuiteP2|testSuite2"""
+            def cmd1 = String.format('-check.f "%s"', suites)
+            def cmd2 = String.format('-check.exclude "%s"', suites)
+            tests["Race Test Chunk #9 executor-part1"] = {
+                run_race_test_heavy_with_args(9, cmd1)
+            }
+            tests["Race Test Chunk #9 executor-part2"] = {
+                run_race_test_heavy_with_args(9, cmd2)
             }
 
             tests["Race Test Chunk #10"] = {
                 run_race_test(10)
             }
-            // run race #6/#8 in parallel mode for master branch\
+            // run race #8 in parallel mode for master branch\
             if (ghprbTargetBranch == "master") {
-                tests["Race Test Chunk #7 ddl-dbsuite"] = {
-                    run_race_test_heavy_with_args(7, '-check.f "testDBSuite"')
+                tests["Race Test Chunk #7 ddl-DBSuite|SerialDBSuite"] = {
+                    run_race_test_heavy_with_args(7, '-check.f "testDBSuite|testSerialDBSuite"')
                 }
 
-                tests["Race Test Chunk #7 ddl-other"] = {
-                    run_race_test_heavy_with_args(7, '-check.exclude "testDBSuite"')
+                tests["Race Test Chunk #7 ddl-other suite"] = {
+                    run_race_test_heavy_with_args(7, '-check.exclude "testDBSuite|testSerialDBSuite"')
                 }
 
-                tests["Race Test Chunk #6"] = {
-                    run_race_test_heavy_parallel(6)
+                tests["Race Test Chunk #6 planner/core-testIntegrationSerialSuite"] = {
+                    run_race_test_heavy_with_args(6, '-check.f "testIntegrationSerialSuite"')	
+                }
+                tests["Race Test Chunk #6 planner/core-testIntegrationSuite"] = {
+                    run_race_test_heavy_with_args(6, '-check.f "testIntegrationSuite"')	
+                }
+                tests["Race Test Chunk #6 planner/core-testPlanSuite"] = {
+                    run_race_test_heavy_with_args(6, '-check.f "testPlanSuite"')	
+                }
+                tests["Race Test Chunk #6 planner/core-other suite"] = {
+                    run_race_test_heavy_with_args(6, '-check.exclude "testPlanSuite|testIntegrationSuite|testIntegrationSerialSuite"')
                 }
                 tests["Race Test Chunk #8 session"] = {
                     run_race_test_heavy_parallel(8)
                 }
 
             } else {
-                tests["Race Test Chunk #7"] = {
+                tests["Race Test Chunk #7 ddl"] = {
                     run_race_test_heavy(7)
                 }
 
-                tests["Race Test Chunk #6"] = {
+                tests["Race Test Chunk #6 planner/core"] = {
                     run_race_test_heavy(6)
                 }
 
@@ -422,71 +375,6 @@ try {
 
             tests["Race Test Chunk #13"] = {
                 run_race_test(13)
-            }
-
-
-            tests["Unit Test Chunk #1"] = {
-                run_unit_test(1)
-            }
-
-            tests["Unit Test Chunk #2"] = {
-                run_unit_test(2)
-            }
-
-            tests["Unit Test Chunk #3"] = {
-                run_unit_test(3)
-            }
-
-            tests["Unit Test Chunk #4"] = {
-                run_unit_test(4)
-            }
-
-            tests["Unit Test Chunk #5"] = {
-                run_unit_test(5)
-            }
-
-            tests["Unit Test Chunk #6"] = {
-                run_unit_test(6)
-            }
-
-            tests["Unit Test Chunk #7"] = {
-                run_unit_test(7)
-            }
-
-            tests["Unit Test Chunk #8"] = {
-                run_unit_test(8)
-            }
-
-            tests["Leak Test Chunk #1"] = {
-                run_leak_test(1)
-            }
-
-            tests["Leak Test Chunk #2"] = {
-                run_leak_test(2)
-            }
-
-            tests["Leak Test Chunk #3"] = {
-                run_leak_test(3)
-            }
-
-            tests["Leak Test Chunk #4"] = {
-                run_leak_test(4)
-            }
-
-            tests["Leak Test Chunk #5"] = {
-                run_leak_test(5)
-            }
-
-            tests["Leak Test Chunk #6"] = {
-                run_leak_test(6)
-            }
-
-            tests["Leak Test Chunk #7"] = {
-                run_leak_test(7)
-            }
-
-            tests["Leak Test Chunk #8"] = {
-                run_leak_test(8)
             }
 
             parallel tests
@@ -530,8 +418,38 @@ catch (Exception e) {
 }
 
 stage("upload status"){
-    node{
+    node("master") {
         sh """curl --connect-timeout 2 --max-time 4 -d '{"job":"$JOB_NAME","id":$BUILD_NUMBER}' http://172.16.5.25:36000/api/v1/ci/job/sync || true"""
+    }
+}
+
+if (params.containsKey("triggered_by_upstream_ci")) {
+    stage("update commit status") {
+        node("master") {
+            if (currentBuild.result == "ABORTED") {
+                PARAM_DESCRIPTION = 'Jenkins job aborted'
+                // Commit state. Possible values are 'pending', 'success', 'error' or 'failure'
+                PARAM_STATUS = 'error'
+            } else if (currentBuild.result == "FAILURE") {
+                PARAM_DESCRIPTION = 'Jenkins job failed'
+                PARAM_STATUS = 'failure'
+            } else if (currentBuild.result == "SUCCESS") {
+                PARAM_DESCRIPTION = 'Jenkins job success'
+                PARAM_STATUS = 'success'
+            } else {
+                PARAM_DESCRIPTION = 'Jenkins job meets something wrong'
+                PARAM_STATUS = 'error'
+            }
+            def default_params = [
+                    string(name: 'TIDB_COMMIT_ID', value: ghprbActualCommit ),
+                    string(name: 'CONTEXT', value: 'idc-jenkins-ci-tidb/unit-test'),
+                    string(name: 'DESCRIPTION', value: PARAM_DESCRIPTION ),
+                    string(name: 'BUILD_URL', value: RUN_DISPLAY_URL ),
+                    string(name: 'STATUS', value: PARAM_STATUS ),
+            ]
+            echo("default params: ${default_params}")
+            build(job: "tidb_update_commit_status", parameters: default_params, wait: true)
+        }
     }
 }
 

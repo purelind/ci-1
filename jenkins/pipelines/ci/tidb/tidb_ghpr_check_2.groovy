@@ -1,6 +1,4 @@
 def notRun = 1
-def buildSlave = "${GO_BUILD_SLAVE}"
-
 
 def slackcolor = 'good'
 def githash
@@ -10,15 +8,7 @@ if (ghprbPullId != null && ghprbPullId != "") {
     specStr = "+refs/pull/${ghprbPullId}/*:refs/remotes/origin/pr/${ghprbPullId}/*"
 }
 
-//def buildSlave = "${GO_BUILD_SLAVE}"
-def testSlave = "${GO_TEST_SLAVE}"
-
-def TIKV_BRANCH = params.getOrDefault("ghprbTargetBranch","")
-def PD_BRANCH = params.getOrDefault("ghprbTargetBranch","")
-
 if (params.containsKey("release_test")) {
-    TIKV_BRANCH = params.release_test__tikv_commit
-    PD_BRANCH = params.release_test__pd_commit
     ghprbTargetBranch = params.getOrDefault("release_test__ghpr_target_branch", params.release_test__release_branch)
     ghprbCommentBody = params.getOrDefault("release_test__ghpr_comment_body", "")
     ghprbActualCommit = params.getOrDefault("release_test__ghpr_actual_commit", params.release_test__tidb_commit)
@@ -27,6 +17,14 @@ if (params.containsKey("release_test")) {
     ghprbPullLink = params.getOrDefault("release_test__ghpr_pull_link", "")
     ghprbPullDescription = params.getOrDefault("release_test__ghpr_pull_description", "")
     specStr = "+refs/heads/*:refs/remotes/origin/*"
+}
+
+def TIKV_BRANCH = ghprbTargetBranch
+def PD_BRANCH = ghprbTargetBranch
+
+if (params.containsKey("release_test") && params.triggered_by_upstream_ci == null) {
+    TIKV_BRANCH = params.release_test__tikv_commit
+    PD_BRANCH = params.release_test__pd_commit
 }
 
 // parse tikv branch
@@ -44,6 +42,90 @@ if (m2) {
 }
 m2 = null
 println "PD_BRANCH=${PD_BRANCH}"
+
+def boolean isBranchMatched(List<String> branches, String targetBranch) {
+    for (String item : branches) {
+        if (targetBranch.startsWith(item)) {
+            println "targetBranch=${targetBranch} matched in ${branches}"
+            return true
+        }
+    }
+    return false
+}
+
+def isNeedGo1160 = isBranchMatched(["master", "release-5.1"], ghprbTargetBranch)
+if (isNeedGo1160) {
+    println "This build use go1.16"
+    GO_BUILD_SLAVE = GO1160_BUILD_SLAVE
+    GO_TEST_SLAVE = GO1160_TEST_SLAVE
+} else {
+    println "This build use go1.13"
+}
+println "BUILD_NODE_NAME=${GO_BUILD_SLAVE}"
+println "TEST_NODE_NAME=${GO_TEST_SLAVE}"
+
+def buildSlave = "${GO_BUILD_SLAVE}"
+def testSlave = "${GO_TEST_SLAVE}"
+
+def sessionTestSuitesString = "testPessimisticSuite"
+
+def test_suites = { suites,option ->
+    node(testSlave) {
+        deleteDir()
+        unstash 'tidb'
+        println "debug command:\nkubectl -n jenkins-ci exec -ti ${NODE_NAME} bash"
+        container("golang") {
+            timeout(720) {
+                ws = pwd()
+                def tikv_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1"
+                def tikv_sha1 = sh(returnStdout: true, script: "curl ${tikv_refs}").trim()
+                tikv_url = "${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-server.tar.gz"
+
+                def pd_refs = "${FILE_SERVER_URL}/download/refs/pingcap/pd/${PD_BRANCH}/sha1"
+                def pd_sha1 = sh(returnStdout: true, script: "curl ${pd_refs}").trim()
+                pd_url = "${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-server.tar.gz"
+                try {
+                    dir("go/src/github.com/pingcap/tidb") {
+                        sh"""
+                        curl ${tikv_url} | tar xz
+                        curl ${pd_url} | tar xz bin
+                        bin/pd-server -name=pd1 --data-dir=pd1 --client-urls=http://127.0.0.1:2379 --peer-urls=http://127.0.0.1:2378 -force-new-cluster &> pd1.log &
+                        bin/tikv-server --pd=127.0.0.1:2379 -s tikv1 --addr=0.0.0.0:20160 --advertise-addr=127.0.0.1:20160 --advertise-status-addr=127.0.0.1:20165 -f  tikv1.log &
+            
+                        bin/pd-server -name=pd2 --data-dir=pd2 --client-urls=http://127.0.0.1:2389 --peer-urls=http://127.0.0.1:2388 -force-new-cluster &>  pd2.log &
+                        bin/tikv-server --pd=127.0.0.1:2389 -s tikv2 --addr=0.0.0.0:20170 --advertise-addr=127.0.0.1:20170 --advertise-status-addr=127.0.0.1:20175 -f  tikv2.log &
+        
+                        bin/pd-server -name=pd3 --data-dir=pd3 --client-urls=http://127.0.0.1:2399 --peer-urls=http://127.0.0.1:2398 -force-new-cluster &> pd3.log &
+                        bin/tikv-server --pd=127.0.0.1:2399 -s tikv3 --addr=0.0.0.0:20190 --advertise-addr=127.0.0.1:20190 --advertise-status-addr=127.0.0.1:20185 -f  tikv3.log &
+            
+                        make failpoint-enable
+                        cd session
+                        export log_level=error
+                        # export GOPROXY=http://goproxy.pingcap.net
+                        GOPATH=${ws}/go go test -with-tikv -pd-addrs=127.0.0.1:2379,127.0.0.1:2389,127.0.0.1:2399 -timeout 10m -vet=off ${option} '${suites}'
+                        #go test -with-tikv -pd-addrs=127.0.0.1:2379 -timeout 10m -vet=off
+                        """
+                    }
+                }catch (Exception e){
+                    sh "cat ${ws}/go/src/github.com/pingcap/tidb/pd1.log || true"
+                    sh "cat ${ws}/go/src/github.com/pingcap/tidb/tikv1.log || true"
+                    sh "cat ${ws}/go/src/github.com/pingcap/tidb/pd2.log || true"
+                    sh "cat ${ws}/go/src/github.com/pingcap/tidb/tikv2.log || true"
+                    sh "cat ${ws}/go/src/github.com/pingcap/tidb/pd3.log || true"
+                    sh "cat ${ws}/go/src/github.com/pingcap/tidb/tikv3.log || true"
+                    throw e
+                }finally {
+                    sh """
+                    set +e
+                    killall -9 -r -q tikv-server
+                    killall -9 -r -q pd-server
+                    set -e
+                    """
+                }
+            }
+        }
+    }
+}
 
 try {
     stage("Pre-check"){
@@ -133,7 +215,6 @@ try {
                         sh """
                         package_base=`grep module go.mod | head -n 1 | awk '{print \$2}'`
                         sed -i  's,go list ./...| grep -vE "cmd",go list ./...| grep -vE "cmd" | grep -vE "store/tikv\$\$",' ./Makefile
-                        sed -i "s,-cover \\\$(PACKAGES),-cover \${package_base}/store/tikv \\\$(PACKAGES)," ./Makefile
                         # export GOPROXY=http://goproxy.pingcap.net
                         if [ \"${ghprbTargetBranch}\" == \"master\" ]  ;then EXTRA_TEST_ARGS='-timeout 9m'  make test_part_2 ; fi
 
@@ -146,67 +227,11 @@ try {
 
 
         if (ghprbTargetBranch == "master"){
-            tests["test session with real tikv"] = {
-                node(testSlave) {
-                    deleteDir()
-                    unstash 'tidb'
-                    println "debug command:\nkubectl -n jenkins-ci exec -ti ${NODE_NAME} bash"
-                    container("golang") {
-                        timeout(5) {
-                            ws = pwd()
-                            def tikv_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1"
-                            def tikv_sha1 = sh(returnStdout: true, script: "curl ${tikv_refs}").trim()
-                            tikv_url = "${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-server.tar.gz"
-
-                            def pd_refs = "${FILE_SERVER_URL}/download/refs/pingcap/pd/${PD_BRANCH}/sha1"
-                            def pd_sha1 = sh(returnStdout: true, script: "curl ${pd_refs}").trim()
-                            pd_url = "${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-server.tar.gz"
-                            try{
-                                dir("go/src/github.com/pingcap/tidb") {
-                                    sh"""
-                                    set +e
-                                    killall -9 -r -q tikv-server
-                                    killall -9 -r -q pd-server
-                                    set -e
-                        
-                                    curl ${tikv_url} | tar xz
-                                    curl ${pd_url} | tar xz bin
-                                    bin/pd-server -name=pd1 --data-dir=pd1 --client-urls=http://127.0.0.1:2379 --peer-urls=http://127.0.0.1:2378 -force-new-cluster &> pd1.log &
-                                    bin/tikv-server --pd=127.0.0.1:2379 -s tikv1 --addr=0.0.0.0:20160 --advertise-addr=127.0.0.1:20160 --advertise-status-addr=127.0.0.1:20165 -f  tikv1.log &
-            
-                                    bin/pd-server -name=pd2 --data-dir=pd2 --client-urls=http://127.0.0.1:2389 --peer-urls=http://127.0.0.1:2388 -force-new-cluster &>  pd2.log &
-                                    bin/tikv-server --pd=127.0.0.1:2389 -s tikv2 --addr=0.0.0.0:20170 --advertise-addr=127.0.0.1:20170 --advertise-status-addr=127.0.0.1:20175 -f  tikv2.log &
-        
-                                    bin/pd-server -name=pd3 --data-dir=pd3 --client-urls=http://127.0.0.1:2399 --peer-urls=http://127.0.0.1:2398 -force-new-cluster &> pd3.log &
-                                    bin/tikv-server --pd=127.0.0.1:2399 -s tikv3 --addr=0.0.0.0:20190 --advertise-addr=127.0.0.1:20190 --advertise-status-addr=127.0.0.1:20185 -f  tikv3.log &
-            
-                                    make failpoint-enable
-                                    cd session
-                                    export log_level=error
-                                    # export GOPROXY=http://goproxy.pingcap.net
-                                    go test -with-tikv -pd-addrs=127.0.0.1:2379,127.0.0.1:2389,127.0.0.1:2399 -timeout 10m -vet=off -check.p
-                                    #go test -with-tikv -pd-addrs=127.0.0.1:2379 -timeout 10m -vet=off
-                                    """
-                                }
-                            }catch (Exception e){
-                                sh "cat ${ws}/go/src/github.com/pingcap/tidb/pd1.log || true"
-                                sh "cat ${ws}/go/src/github.com/pingcap/tidb/tikv1.log || true"
-                                sh "cat ${ws}/go/src/github.com/pingcap/tidb/pd2.log || true"
-                                sh "cat ${ws}/go/src/github.com/pingcap/tidb/tikv2.log || true"
-                                sh "cat ${ws}/go/src/github.com/pingcap/tidb/pd3.log || true"
-                                sh "cat ${ws}/go/src/github.com/pingcap/tidb/tikv3.log || true"
-                                throw e
-                            }finally {
-                                sh """
-                                set +e
-                                killall -9 -r -q tikv-server
-                                killall -9 -r -q pd-server
-                                set -e
-                                """
-                            }
-                        }
-                    }
-                }
+            tests["test session with real tikv suites ${sessionTestSuitesString}"] = {
+                test_suites(sessionTestSuitesString, "-check.f")
+            }
+            tests["test session with real tikv exclude suites ${sessionTestSuitesString}"] = {
+                test_suites(sessionTestSuitesString, "-check.exclude")
             }
         }
         parallel tests
@@ -261,8 +286,38 @@ catch (Exception e) {
 }
 
 stage("upload status"){
-    node{
+    node("master") {
         sh """curl --connect-timeout 2 --max-time 4 -d '{"job":"$JOB_NAME","id":$BUILD_NUMBER}' http://172.16.5.25:36000/api/v1/ci/job/sync || true"""
+    }
+}
+
+if (params.containsKey("triggered_by_upstream_ci")) {
+    stage("update commit status") {
+        node("master") {
+            if (currentBuild.result == "ABORTED") {
+                PARAM_DESCRIPTION = 'Jenkins job aborted'
+                // Commit state. Possible values are 'pending', 'success', 'error' or 'failure'
+                PARAM_STATUS = 'error'
+            } else if (currentBuild.result == "FAILURE") {
+                PARAM_DESCRIPTION = 'Jenkins job failed'
+                PARAM_STATUS = 'failure'
+            } else if (currentBuild.result == "SUCCESS") {
+                PARAM_DESCRIPTION = 'Jenkins job success'
+                PARAM_STATUS = 'success'
+            } else {
+                PARAM_DESCRIPTION = 'Jenkins job meets something wrong'
+                PARAM_STATUS = 'error'
+            }
+            def default_params = [
+                    string(name: 'TIDB_COMMIT_ID', value: ghprbActualCommit ),
+                    string(name: 'CONTEXT', value: 'idc-jenkins-ci-tidb/check_dev_2'),
+                    string(name: 'DESCRIPTION', value: PARAM_DESCRIPTION ),
+                    string(name: 'BUILD_URL', value: RUN_DISPLAY_URL ),
+                    string(name: 'STATUS', value: PARAM_STATUS ),
+            ]
+            echo("default params: ${default_params}")
+            build(job: "tidb_update_commit_status", parameters: default_params, wait: true)
+        }
     }
 }
 

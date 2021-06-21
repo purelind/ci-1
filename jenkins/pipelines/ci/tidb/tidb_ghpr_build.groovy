@@ -1,3 +1,14 @@
+echo "release test: ${params.containsKey("release_test")}"
+if (params.containsKey("release_test")) {
+    ghprbTargetBranch = params.getOrDefault("release_test__ghpr_target_branch", params.release_test__release_branch)
+    ghprbCommentBody = params.getOrDefault("release_test__ghpr_comment_body", "")
+    ghprbActualCommit = params.getOrDefault("release_test__ghpr_actual_commit", params.release_test__tidb_commit)
+    ghprbPullId = params.getOrDefault("release_test__ghpr_pull_id", "")
+    ghprbPullTitle = params.getOrDefault("release_test__ghpr_pull_title", "")
+    ghprbPullLink = params.getOrDefault("release_test__ghpr_pull_link", "")
+    ghprbPullDescription = params.getOrDefault("release_test__ghpr_pull_description", "")
+}
+
 def slackcolor = 'good'
 def githash
 
@@ -23,6 +34,25 @@ if (ghprbPullId != null && ghprbPullId != "") {
 }
 
 def isBuildCheck = ghprbCommentBody && ghprbCommentBody.contains("/run-all-tests")
+
+def boolean isBranchMatched(List<String> branches, String targetBranch) {
+    for (String item : branches) {
+        if (targetBranch.startsWith(item)) {
+            println "targetBranch=${targetBranch} matched in ${branches}"
+            return true
+        }
+    }
+    return false
+}
+
+def isNeedGo1160 = isBranchMatched(["master", "release-5.1"], ghprbTargetBranch)
+if (isNeedGo1160) {
+    println "This build use go1.16"
+    GO_BUILD_SLAVE = GO1160_BUILD_SLAVE
+} else {
+    println "This build use go1.13"
+}
+println "BUILD_NODE_NAME=${GO_BUILD_SLAVE}"
 
 try {
     node("${GO_BUILD_SLAVE}") {
@@ -142,9 +172,13 @@ try {
                 }
 
                 stage("Upload") {
+
                     def filepath = "builds/pingcap/tidb/pr/${ghprbActualCommit}/centos7/tidb-server.tar.gz"
                     def donepath = "builds/pingcap/tidb/pr/${ghprbActualCommit}/centos7/done"
                     def refspath = "refs/pingcap/tidb/pr/${ghprbPullId}/sha1"
+                    if (params.containsKey("triggered_by_upstream_ci")) {
+                        refspath = "refs/pingcap/tidb/pr/branch-${ghprbTargetBranch}/sha1"
+                    }
 
                     container("golang") {
                         dir("go/src/github.com/pingcap/tidb") {
@@ -203,13 +237,15 @@ try {
                             }
                             dir("go/src/github.com/pingcap/enterprise-plugin/whitelist") {
                                 sh """
-                               ${ws}/go/src/github.com/pingcap/tidb-build-plugin/cmd/pluginpkg/pluginpkg -pkg-dir ${ws}/go/src/github.com/pingcap/enterprise-plugin/whitelist -out-dir ${ws}/go/src/github.com/pingcap/enterprise-plugin/whitelist
-                               """
+                                GO111MODULE=on go mod tidy
+                                ${ws}/go/src/github.com/pingcap/tidb-build-plugin/cmd/pluginpkg/pluginpkg -pkg-dir ${ws}/go/src/github.com/pingcap/enterprise-plugin/whitelist -out-dir ${ws}/go/src/github.com/pingcap/enterprise-plugin/whitelist
+                                """
                             }
                             dir("go/src/github.com/pingcap/enterprise-plugin/audit") {
                                 sh """
-                               ${ws}/go/src/github.com/pingcap/tidb-build-plugin/cmd/pluginpkg/pluginpkg -pkg-dir ${ws}/go/src/github.com/pingcap/enterprise-plugin/audit -out-dir ${ws}/go/src/github.com/pingcap/enterprise-plugin/audit
-                               """
+                                GO111MODULE=on go mod tidy
+                                ${ws}/go/src/github.com/pingcap/tidb-build-plugin/cmd/pluginpkg/pluginpkg -pkg-dir ${ws}/go/src/github.com/pingcap/enterprise-plugin/audit -out-dir ${ws}/go/src/github.com/pingcap/enterprise-plugin/audit
+                                """
                             }
                         }
                     }

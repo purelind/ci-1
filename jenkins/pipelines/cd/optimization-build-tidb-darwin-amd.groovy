@@ -10,9 +10,29 @@
 * @IMPORTER_HASH
 * @TIFLASH_HASH
 * @RELEASE_TAG
-* @PRE_RELEASE
 * @FORCE_REBUILD
+* @RELEASE_BRANCH
+* @TIKV_PRID
 */
+GO_BIN_PATH="/usr/local/go/bin"
+def boolean tagNeedUpgradeGoVersion(String tag) {
+    if (tag.startsWith("v") && tag > "v5.1") {
+        println "tag=${tag} need upgrade go version"
+        return true
+    }
+    return false
+}
+
+def isNeedGo1160 = tagNeedUpgradeGoVersion(RELEASE_TAG)
+if (isNeedGo1160) {
+    println "This build use go1.16"
+    GO_BIN_PATH="/usr/local/go1.16.4/bin"
+} else {
+    println "This build use go1.13"
+}
+println "GO_BIN_PATH=${GO_BIN_PATH}"
+
+
 def slackcolor = 'good'
 os = "darwin"
 arch = "amd64"
@@ -20,7 +40,7 @@ platform = "darwin"
 def TIDB_CTL_HASH = "master"
 
 def checkIfFileCacheExists(product, hash, binary) {
-    if (FORCE_REBUILD) {
+    if (params.FORCE_REBUILD) {
         return false
     }
     if (!fileExists("gethash.py")) {
@@ -52,6 +72,9 @@ def checkIfFileCacheExists(product, hash, binary) {
 def build_upload = { product, hash, binary ->
     stage("Build ${product}") {
         node("mac") {
+            if (checkIfFileCacheExists(product, hash, binary)) {
+                return
+            }
             def repo = "git@github.com:pingcap/${product}.git"
             def workspace = WORKSPACE
             dir("${workspace}/go/src/github.com/pingcap/${product}") {
@@ -101,7 +124,7 @@ def build_upload = { product, hash, binary ->
                 if (product == "tidb-ctl") {
                     sh """
                     export GOPATH=/Users/pingcap/gopkg
-                    export PATH=/Users/pingcap/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/pingcap/.cargo/bin:/usr/local/go/bin
+                    export PATH=/Users/pingcap/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/pingcap/.cargo/bin:${GO_BIN_PATH}
                     go build -o /Users/pingcap/binarys/${product}
                     rm -rf ${target}
                     mkdir -p ${target}/bin
@@ -116,10 +139,11 @@ def build_upload = { product, hash, binary ->
                     git branch -D refs/tags/${RELEASE_TAG} || true
                     git checkout -b refs/tags/${RELEASE_TAG}
                     export GOPATH=/Users/pingcap/gopkg
-                    export PATH=/Users/pingcap/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/pingcap/.cargo/bin:/usr/local/go/bin
+                    export PATH=/Users/pingcap/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/pingcap/.cargo/bin:${GO_BIN_PATH}
                     if [ ${product} != "pd" ]; then
                         make clean
                     fi;
+                    git checkout .
                     make
                     if [ ${product} = "pd" ]; then
                         make tools;
@@ -139,7 +163,7 @@ def build_upload = { product, hash, binary ->
                     git branch -D refs/tags/${RELEASE_TAG} || true
                     git checkout -b refs/tags/${RELEASE_TAG}
                     export GOPATH=/Users/pingcap/gopkg
-                    export PATH=/Users/pingcap/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/pingcap/.cargo/bin:/usr/local/go/bin
+                    export PATH=/Users/pingcap/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/pingcap/.cargo/bin:${GO_BIN_PATH}
                     if [ ${product} = "tidb-tools" ]; then
                         make clean;
                     fi;  
@@ -175,52 +199,34 @@ try {
 
     stage("Build") {
         builds = [:]
-
-        if (BUILD_TIKV_IMPORTER == "false") {
-            builds = [:]
-            if (!checkIfFileCacheExists("tidb-ctl", TIDB_CTL_HASH, "tidb-ctl")) {
-                builds["Build tidb-ctl"] = {
-                    build_upload("tidb-ctl", TIDB_CTL_HASH, "tidb-ctl")
-                }
-            }
-            if (!checkIfFileCacheExists("tidb", TIDB_HASH, "tidb-server")) {
-                builds["Build tidb"] = {
-                    build_upload("tidb", TIDB_HASH, "tidb-server")
-                }
-            }
-            if (!checkIfFileCacheExists("tidb-binlog", BINLOG_HASH, "tidb-binlog")) {
-                builds["Build tidb-binlog"] = {
-                    build_upload("tidb-binlog", BINLOG_HASH, "tidb-binlog")
-                }
-            }
-            if (!checkIfFileCacheExists("tidb-tools", TOOLS_HASH, "tidb-tools")) {
-                builds["Build tidb-tools"] = {
-                    build_upload("tidb-tools", TOOLS_HASH, "tidb-tools")
-                }
-            }
-            if (!checkIfFileCacheExists("pd", PD_HASH, "pd-server")) {
-                builds["Build pd"] = {
-                    build_upload("pd", PD_HASH, "pd-server")
-                }
-            }
-            if (!checkIfFileCacheExists("ticdc", CDC_HASH, "ticdc")) {
-                builds["Build ticdc"] = {
-                    build_upload("ticdc", CDC_HASH, "ticdc")
-                }
-            }
-            if (!checkIfFileCacheExists("br", BR_HASH, "br")) {
-                builds["Build br"] = {
-                    build_upload("br", BR_HASH, "br")
-                }
-            }
-            if (!checkIfFileCacheExists("dumpling", DUMPLING_HASH, "dumpling")) {
-                builds["Build dumpling"] = {
-                    build_upload("dumpling", DUMPLING_HASH, "dumpling")
-                }
-            }
+        
+        builds["Build tidb-ctl"] = {
+            build_upload("tidb-ctl", TIDB_CTL_HASH, "tidb-ctl")
         }
+        builds["Build tidb"] = {
+            build_upload("tidb", TIDB_HASH, "tidb-server")
+        }
+        builds["Build tidb-binlog"] = {
+            build_upload("tidb-binlog", BINLOG_HASH, "tidb-binlog")
+        }
+        builds["Build tidb-tools"] = {
+            build_upload("tidb-tools", TOOLS_HASH, "tidb-tools")
+        }
+        builds["Build pd"] = {
+            build_upload("pd", PD_HASH, "pd-server")
+        }
+        builds["Build ticdc"] = {
+            build_upload("ticdc", CDC_HASH, "ticdc")
+        }
+        builds["Build br"] = {
+            build_upload("br", BR_HASH, "br")
+        }
+        builds["Build dumpling"] = {
+            build_upload("dumpling", DUMPLING_HASH, "dumpling")
+        }
+        
 
-        if (SKIP_TIFLASH == "false" && BUILD_TIKV_IMPORTER == "false") {
+        if (SKIP_TIFLASH == "false") {
             builds["Build tiflash"] = {
                 stage("Build tiflash") {
                     node("mac-i5") {
@@ -244,7 +250,7 @@ try {
                             """
                             sh """
                             export GOPATH=/Users/pingcap/gopkg
-                            export PATH=/Users/pingcap/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/pingcap/.cargo/bin:/usr/local/go/bin:/usr/local/opt/binutils/bin/
+                            export PATH=/Users/pingcap/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/pingcap/.cargo/bin:${GO_BIN_PATH}:/usr/local/opt/binutils/bin/
                             mkdir -p release-darwin/build/
                             [ -f "release-darwin/build/build-release.sh" ] || curl -s ${FILE_SERVER_URL}/download/builds/pingcap/ee/tiflash/build-release.sh > release-darwin/build/build-release.sh
                             [ -f "release-darwin/build/build-cluster-manager.sh" ] || curl -s ${FILE_SERVER_URL}/download/builds/pingcap/ee/tiflash/build-cluster-manager.sh > release-darwin/build/build-cluster-manager.sh
@@ -276,23 +282,33 @@ try {
                         def target = "tikv-${RELEASE_TAG}-${os}-${arch}"
                         def filepath = "builds/pingcap/tikv/optimization/${TIKV_HASH}/darwin/tikv-server.tar.gz"
 
+                        def specStr = "+refs/pull/*:refs/remotes/origin/pr/*"
+                        if (TIKV_PRID != null && TIKV_PRID != "") {
+                            specStr = "+refs/pull/${TIKV_PRID}/*:refs/remotes/origin/pr/${TIKV_PRID}/*"
+                        }
+                        def branch = TIKV_HASH
+                        if (RELEASE_BRANCH != null && RELEASE_BRANCH != "") {
+                            branch =RELEASE_BRANCH
+                        }
+
                         retry(20) {
                             if (sh(returnStatus: true, script: '[ -d .git ] || git rev-parse --git-dir > /dev/null 2>&1') != 0) {
                                 deleteDir()
                             }
-                            checkout changelog: false, poll: true, scm: [$class: 'GitSCM', branches: [[name: "${TIKV_HASH}"]], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'CheckoutOption', timeout: 30], [$class: 'CloneOption', timeout: 60], [$class: 'PruneStaleBranch'], [$class: 'CleanBeforeCheckout']], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'github-sre-bot-ssh', refspec: '+refs/heads/*:refs/remotes/origin/*', url: 'git@github.com:tikv/tikv.git']]]
+                            checkout changelog: false, poll: true, scm: [$class: 'GitSCM', branches: [[name: "${branch}"]], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'CheckoutOption', timeout: 30], [$class: 'CloneOption', timeout: 60], [$class: 'PruneStaleBranch'], [$class: 'CleanBeforeCheckout']], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'github-sre-bot-ssh', refspec: specStr, url: 'git@github.com:tikv/tikv.git']]]
                         }
-                        if (BUILD_TIKV_IMPORTER == "false") {
-                            sh """
-                            for a in \$(git tag --contains ${TIKV_HASH}); do echo \$a && git tag -d \$a;done
-                            git tag -f ${RELEASE_TAG} ${TIKV_HASH}
-                            git branch -D refs/tags/${RELEASE_TAG} || true
-                            git checkout -b refs/tags/${RELEASE_TAG}
-                            """
-                        }
+                        
+                        sh """
+                        git checkout -f ${TIKV_HASH}
+                        for a in \$(git tag --contains ${TIKV_HASH}); do echo \$a && git tag -d \$a;done
+                        git tag -f ${RELEASE_TAG} ${TIKV_HASH}
+                        git branch -D refs/tags/${RELEASE_TAG} || true
+                        git checkout -b refs/tags/${RELEASE_TAG}
+                        """
+                        
                         sh """
                         export GOPATH=/Users/pingcap/gopkg
-                        export PATH=/Users/pingcap/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/pingcap/.cargo/bin:/usr/local/go/bin:/usr/local/opt/binutils/bin/
+                        export PATH=/Users/pingcap/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/pingcap/.cargo/bin:${GO_BIN_PATH}:/usr/local/opt/binutils/bin/
                         CARGO_TARGET_DIR=/Users/pingcap/.target ROCKSDB_SYS_STATIC=1 make dist_release
                         rm -rf ${target}
                         mkdir -p ${target}/bin
@@ -321,17 +337,17 @@ try {
                             }
                             checkout changelog: false, poll: true, scm: [$class: 'GitSCM', branches: [[name: "${IMPORTER_HASH}"]], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'CheckoutOption', timeout: 30], [$class: 'CloneOption', timeout: 60], [$class: 'PruneStaleBranch'], [$class: 'CleanBeforeCheckout']], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'github-sre-bot-ssh', refspec: '+refs/heads/*:refs/remotes/origin/*', url: 'git@github.com:tikv/importer.git']]]
                         }
-                        if (BUILD_TIKV_IMPORTER == "false") {
-                            sh """
-                            for a in \$(git tag --contains ${IMPORTER_HASH}); do echo \$a && git tag -d \$a;done
-                            git tag -f ${RELEASE_TAG} ${IMPORTER_HASH}
-                            git branch -D refs/tags/${RELEASE_TAG} || true
-                            git checkout -b refs/tags/${RELEASE_TAG}
-                            """
-                        }
+                        
+                        sh """
+                        for a in \$(git tag --contains ${IMPORTER_HASH}); do echo \$a && git tag -d \$a;done
+                        git tag -f ${RELEASE_TAG} ${IMPORTER_HASH}
+                        git branch -D refs/tags/${RELEASE_TAG} || true
+                        git checkout -b refs/tags/${RELEASE_TAG}
+                        """
+                        
                         sh """
                         export GOPATH=/Users/pingcap/gopkg
-                        export PATH=/Users/pingcap/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/pingcap/.cargo/bin:/usr/local/go/bin:/usr/local/opt/binutils/bin/
+                        export PATH=/Users/pingcap/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/pingcap/.cargo/bin:${GO_BIN_PATH}:/usr/local/opt/binutils/bin/
                         ROCKSDB_SYS_SSE=0 make release
                         rm -rf ${target}
                         mkdir -p ${target}/bin

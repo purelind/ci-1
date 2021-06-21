@@ -43,20 +43,34 @@ println "TIDB_TEST_BRANCH=${TIDB_TEST_BRANCH}"
 def pd_url = "${FILE_SERVER_URL}/download/builds/pingcap/pd/pr/${ghprbActualCommit}/centos7/pd-server.tar.gz"
 
 def tidb_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tidb/${TIDB_BRANCH}/sha1"
-//def build_node = "build_go1112"
-//def test_node = "test_go1112"
-def build_node = "${GO_BUILD_SLAVE}"
-def test_node = "${GO_TEST_SLAVE}"
-if(ghprbTargetBranch == "master" ||ghprbTargetBranch == "release-3.0"|| ghprbTargetBranch == "release-3.1" || ghprbTargetBranch == "release-2.1" || ghprbTargetBranch == "release-4.0") {
-        build_node = "${GO_BUILD_SLAVE}"
-        test_node = "${GO_TEST_SLAVE}"
+
+def boolean isBranchMatched(List<String> branches, String targetBranch) {
+    for (String item : branches) {
+        if (targetBranch.startsWith(item)) {
+            println "targetBranch=${targetBranch} matched in ${branches}"
+            return true
+        }
+    }
+    return false
 }
+
+def isNeedGo1160 = isBranchMatched(["master", "release-5.1"], ghprbTargetBranch)
+if (isNeedGo1160) {
+    println "This build use go1.16"
+    GO_BUILD_SLAVE = GO1160_BUILD_SLAVE
+    GO_TEST_SLAVE = GO1160_TEST_SLAVE
+} else {
+    println "This build use go1.13"
+}
+println "BUILD_NODE_NAME=${GO_BUILD_SLAVE}"
+println "TEST_NODE_NAME=${GO_TEST_SLAVE}"
+
 try {
     stage('Prepare') {
         def prepares = [:]
 
         prepares["Part #1"] = {
-            node(build_node) {
+            node("${GO_BUILD_SLAVE}") {
                 def ws = pwd()
                 deleteDir()
                 println "debug command:\nkubectl -n jenkins-ci exec -ti ${NODE_NAME} bash"
@@ -105,7 +119,7 @@ try {
         }
 
         prepares["Part #2"] = {
-            node(build_node) {
+            node("${GO_BUILD_SLAVE}") {
                def ws = pwd()
                 deleteDir()
                 println "debug command:\nkubectl -n jenkins-ci exec -ti ${NODE_NAME} bash"
@@ -162,7 +176,7 @@ try {
         def tests = [:]
 
         def run = { test_dir, mytest, test_cmd ->
-            node(test_node) {
+            node("${GO_TEST_SLAVE}") {
                 println "debug command:\nkubectl -n jenkins-ci exec -ti ${NODE_NAME} bash"
                 def ws = pwd()
                 deleteDir()
@@ -279,82 +293,6 @@ try {
             run("mysql_test", "mysqltest", "CACHE_ENABLED=1 ./test.sh")
         }
 
-        tests["Integration Connection Test"] = {
-            node(test_node) {
-                def ws = pwd()
-                def mytest = "connectiontest"
-                deleteDir()
-                unstash "tidb-test"
-                
-                println "debug command:\nkubectl -n jenkins-ci exec -ti ${NODE_NAME} bash"
-
-                dir("go/src/github.com/pingcap/tidb") {
-                    container("golang") {
-                        def tidb_sha1 = sh(returnStdout: true, script: "curl ${tidb_refs}").trim()
-                        def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${tidb_sha1}/centos7/tidb-server.tar.gz"
-
-                        def tikv_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1"
-                        def tikv_sha1 = sh(returnStdout: true, script: "curl ${tikv_refs}").trim()
-                        tikv_url = "${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-server.tar.gz"
-
-                        timeout(30) {
-                        	retry(3){
-                        	    deleteDir()
-	                            sh """
-	                            while ! curl --output /dev/null --silent --head --fail ${tikv_url}; do sleep 15; done
-	                            curl ${tikv_url} | tar xz
-	
-	                            while ! curl --output /dev/null --silent --head --fail ${pd_url}; do sleep 15; done
-	                            curl ${pd_url} | tar xz ./bin
-	
-	                            while ! curl --output /dev/null --silent --head --fail ${tidb_url}; do sleep 15; done
-	                            curl ${tidb_url} | tar xz
-	                            """                        	    
-                        	}
-                        }
-
-                        try {
-                            timeout(10) {
-                                sh """
-                                set +e
-                                killall -9 -r tidb-server
-                                killall -9 -r tikv-server
-                                killall -9 -r pd-server
-                                rm -rf /tmp/tidb
-                                rm -rf ./tikv ./pd
-                                set -e
-
-                                bin/pd-server --name=pd --data-dir=pd &>pd_${mytest}.log &
-                                sleep 20
-                                echo '[storage]\nreserve-space = "0MB"'> tikv_config.toml
-                                bin/tikv-server -C tikv_config.toml --pd=127.0.0.1:2379 -s tikv --addr=0.0.0.0:20160 --advertise-addr=127.0.0.1:20160 &>tikv_${mytest}.log &
-                                sleep 20
-
-                                mkdir -p \$GOPATH/pkg/mod && mkdir -p ${ws}/go/pkg && ln -sf \$GOPATH/pkg/mod ${ws}/go/pkg/mod 
-                                GOPATH=${ws}/go CGO_ENABLED=1 make tikv_integration_test 2>&1
-                                """
-                            }
-                        } catch (err) {
-                            sh """
-                            cat pd_${mytest}.log
-                            cat tikv_${mytest}.log
-                            cat tidb*.log mysql*.out 2>/dev/null
-                            """
-                            throw err
-                        } finally {
-                            sh """
-                            set +e
-                            killall -9 -r tidb-server
-                            killall -9 -r tikv-server
-                            killall -9 -r pd-server
-                            set -e
-                            """
-                        }
-                    }
-                }
-            }
-        }
-
         parallel tests
     }
 
@@ -381,7 +319,7 @@ finally {
 }
 
 stage("upload status"){
-    node{
+    node("master"){
         sh """curl --connect-timeout 2 --max-time 4 -d '{"job":"$JOB_NAME","id":$BUILD_NUMBER}' http://172.16.5.13:36000/api/v1/ci/job/sync || true"""
     }
 }

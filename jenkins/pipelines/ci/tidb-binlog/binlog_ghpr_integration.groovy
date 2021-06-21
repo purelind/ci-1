@@ -40,15 +40,41 @@ if (m3) {
 m3 = null
 println "TIDB_BRANCH=${TIDB_BRANCH}"
 
+def boolean isBranchMatched(List<String> branches, String targetBranch) {
+    for (String item : branches) {
+        if (targetBranch.startsWith(item)) {
+            println "targetBranch=${targetBranch} matched in ${branches}"
+            return true
+        }
+    }
+    return false
+}
+
+def isNeedGo1160 = isBranchMatched(["master", "release-5.1"], ghprbTargetBranch)
+if (isNeedGo1160) {
+    println "This build use go1.16"
+    GO_BUILD_SLAVE = GO1160_BUILD_SLAVE
+    GO_TEST_SLAVE = GO1160_TEST_SLAVE
+    POD_GO_DOCKER_IMAGE = "hub.pingcap.net/pingcap/centos7_golang-1.16:latest"
+} else {
+    println "This build use go1.13"
+    POD_GO_DOCKER_IMAGE = "hub.pingcap.net/jenkins/centos7_golang-1.13:cached"
+}
+println "BUILD_NODE_NAME=${GO_BUILD_SLAVE}"
+println "TEST_NODE_NAME=${GO_TEST_SLAVE}"
+
 try {
-    def buildSlave = "${GO_BUILD_SLAVE}"
     stage('Prepare') {
-        node (buildSlave) {
+        node ("${GO_BUILD_SLAVE}") {
             container("golang") {
                 def ws = pwd()
                 deleteDir()
                 // tidb-binlog
-                dir("/home/jenkins/agent/git/tidb-binlog") { 
+  
+                dir("${ws}/go/src/github.com/pingcap/tidb-binlog") {
+                    container("golang") {
+                        println "debug command:\nkubectl -n jenkins-ci exec -ti ${NODE_NAME} bash" 
+
                         if (sh(returnStatus: true, script: '[ -d .git ] && [ -f Makefile ] && git rev-parse --git-dir > /dev/null 2>&1') != 0) {
                             deleteDir()
                         }
@@ -57,22 +83,18 @@ try {
                         } catch (error) {
                             retry(2) {
                                 echo "checkout failed, retry.."
-                                sleep 60
+                                sleep 5
                                 if (sh(returnStatus: true, script: '[ -d .git ] && [ -f Makefile ] && git rev-parse --git-dir > /dev/null 2>&1') != 0) {
                                     deleteDir()
                                 }
                                 checkout changelog: false, poll: false, scm: [$class: 'GitSCM', branches: [[name: 'master']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'PruneStaleBranch'], [$class: 'CleanBeforeCheckout']], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'github-sre-bot-ssh', refspec: '+refs/pull/*:refs/remotes/origin/pr/*', url: 'git@github.com:pingcap/tidb-binlog.git']]]
                             }
                         }
-                    }
 
-                dir("go/src/github.com/pingcap/tidb-binlog") {
-                    sh """
-                        cp -R /home/jenkins/agent/git/tidb-binlog/. ./
-                        git checkout -f ${ghprbActualCommit}
-                    """
+                        sh "git checkout -f ${ghprbActualCommit}"
+                    }
                 }
-                
+               
                 stash includes: "go/src/github.com/pingcap/tidb-binlog/**", name: "tidb-binlog", useDefaultExcludes: false
 
                 // tikv
@@ -112,7 +134,7 @@ try {
             podTemplate(label: label, 
             idleMinutes: 0,
             containers: [
-                containerTemplate(name: 'golang',alwaysPullImage: false, image: "${GO_DOCKER_IMAGE}", 
+                containerTemplate(name: 'golang',alwaysPullImage: false, image: "${POD_GO_DOCKER_IMAGE}",
                 resourceRequestCpu: '2000m', resourceRequestMemory: '4Gi',
                 ttyEnabled: true, command: 'cat'),
                 containerTemplate(name: 'zookeeper',alwaysPullImage: false, image: 'wurstmeister/zookeeper', 
