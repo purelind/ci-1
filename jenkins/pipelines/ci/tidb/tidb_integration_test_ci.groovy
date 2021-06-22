@@ -1,5 +1,5 @@
 
-node("${GO_TEST_SLAVE}") {
+node("${github-status-updater}") {
     stage("Print env"){
         // commit id / branch / pusher / commit message
         def trimPrefix = {
@@ -9,6 +9,16 @@ node("${GO_TEST_SLAVE}") {
         if ( env.REF != '' ) {
             echo 'trigger by remote invoke'
             TIDB_BRANCH = trimPrefix(ref)
+            def m1 = GEWT_COMMIT_MSG =~ /(?<=\()(.*?)(?=\))/
+            if (m1) {
+                GEWT_PULL_ID = "${m1[0][1]}"
+                GEWT_PULL_ID = GEWT_PULL_ID.substring(1)
+            }
+            m1 = null
+            echo "commit_msg=${GEWT_COMMIT_MSG}"
+            echo "author=${GEWT_AUTHOR}"
+            echo "author_email=${GEWT_AUTHOR_EMAIL}"
+            echo "pull_id=${GEWT_PULL_ID}"
         } else {
             echo 'trigger manually'
             echo "param ref not exist"
@@ -84,4 +94,44 @@ node("${GO_TEST_SLAVE}") {
             )
         }
     }
+
+    stage("alert") {
+        container("python3") {
+            if ( env.REF != '' ) {
+                sh """
+                cat > env_param.conf <<EOF
+export BRANCH=${TIDB_BRANCH}
+export COMMIT_ID=${TIDB_COMMIT_ID}
+export AUTHOR=${GEWT_AUTHOR}
+export AUTHOR_EMAIL=${GEWT_AUTHOR_EMAIL}
+export PULL_ID=${GEWT_PULL_ID}
+EOF
+                """
+            }  else {
+                sh """
+                cat > env_param.conf <<EOF
+export BRANCH=${TIDB_BRANCH}
+export COMMIT_ID=${TIDB_COMMIT_ID}
+EOF
+                """
+            }
+            sh "cat env_param.conf"
+            sh "curl -LO ${FILE_SERVER_URL}/download/cicd/scripts/tidb_integration_test_ci_alert.py"
+
+            withCredentials([string(credentialsId: 'sre-bot-token', variable: 'GITHUB_API_TOKEN'),
+                             string(credentialsId: 'debug-feishu-alert-url-integration-test', variable: "FEISHU_ALERT_URL")
+            ]) {
+                sh '''#!/bin/bash
+                set +x
+                export GITHUB_API_TOKEN=${GITHUB_API_TOKEN}
+                export FEISHU_ALERT_URL=${FEISHU_ALERT_URL}
+                source env_param.conf
+                python3 tidb_integration_test_ci_alert.py > alert_feishu.log
+                set -x
+                cat alert_feishu.log
+                '''
+            }
+        }
+    }
 }
+
