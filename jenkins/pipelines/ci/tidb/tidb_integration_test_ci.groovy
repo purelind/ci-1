@@ -1,5 +1,5 @@
 
-node("${github-status-updater}") {
+node("github-status-updater") {
     stage("Print env"){
         // commit id / branch / pusher / commit message
         def trimPrefix = {
