@@ -43,62 +43,70 @@ node("github-status-updater") {
         echo("default params: ${default_params}")
 
     }
-    stage("Build") {
-        build(job: "tidb_ghpr_build", parameters: default_params, wait: true)
-    }
-    stage("Trigger Test Job") {
-        container("golang") {
-            parallel(
-                    // integration test
-                    tidb_ghpr_integration_br_test: {
-                        build(job: "tidb_ghpr_integration_br_test", parameters: default_params, wait: true)
-                    },
-                    tidb_ghpr_common_test: {
-                        build(job: "tidb_ghpr_common_test", parameters: default_params, wait: true)
-                    },
-                    tidb_ghpr_integration_common_test: {
-                        build(job: "tidb_ghpr_integration_common_test", parameters: default_params, wait: true)
-                    },
-                    tidb_ghpr_integration_campatibility_test: {
-                        build(job: "tidb_ghpr_integration_campatibility_test", parameters: default_params, wait: true)
-                    },
-                    tidb_ghpr_integration_copr_test: {
-                        build(job: "tidb_ghpr_integration_copr_test", parameters: default_params, wait: true)
-                    },
-                    tidb_ghpr_integration_ddl_test: {
-                        build(job: "tidb_ghpr_integration_ddl_test", parameters: default_params, wait: true)
-                    },
-                    tidb_ghpr_mybatis: {
-                        build(job: "tidb_ghpr_mybatis", parameters: default_params, wait: true)
-                    },
-                    tidb_ghpr_sqllogic_test_1: {
-                        build(job: "tidb_ghpr_sqllogic_test_1", parameters: default_params, wait: true)
-                    },
-                    tidb_ghpr_sqllogic_test_2: {
-                        build(job: "tidb_ghpr_sqllogic_test_2", parameters: default_params, wait: true)
-                    },
-                    tidb_ghpr_tics_test: {
-                        build(job: "tidb_ghpr_tics_test", parameters: default_params, wait: true)
-                    },
 
-                    // unit test
-                    // tidb_ghpr_unit_test: {
-                    //     build(job: "tidb_ghpr_unit_test", parameters: default_params, wait: true)
-                    // },
-                    // tidb_ghpr_check: {
-                    //     build(job: "tidb_ghpr_check", parameters: default_params, wait: true)
-                    // },
-                    // tidb_ghpr_check_2: {
-                    //     build(job: "tidb_ghpr_check_2", parameters: default_params, wait: true)
-                    // },
-            )
+    try {
+        stage("Build") {
+            build(job: "tidb_ghpr_build", parameters: default_params, wait: true)
         }
-    }
+        stage("Trigger Test Job") {
+            container("golang") {
+                parallel(
+                        // integration test
+                        tidb_ghpr_integration_br_test: {
+                            build(job: "tidb_ghpr_integration_br_test", parameters: default_params, wait: true)
+                        },
+                        tidb_ghpr_common_test: {
+                            build(job: "tidb_ghpr_common_test", parameters: default_params, wait: true)
+                        },
+                        tidb_ghpr_integration_common_test: {
+                            build(job: "tidb_ghpr_integration_common_test", parameters: default_params, wait: true)
+                        },
+                        tidb_ghpr_integration_campatibility_test: {
+                            build(job: "tidb_ghpr_integration_campatibility_test", parameters: default_params, wait: true)
+                        },
+                        tidb_ghpr_integration_copr_test: {
+                            build(job: "tidb_ghpr_integration_copr_test", parameters: default_params, wait: true)
+                        },
+                        tidb_ghpr_integration_ddl_test: {
+                            build(job: "tidb_ghpr_integration_ddl_test", parameters: default_params, wait: true)
+                        },
+                        tidb_ghpr_mybatis: {
+                            build(job: "tidb_ghpr_mybatis", parameters: default_params, wait: true)
+                        },
+                        tidb_ghpr_sqllogic_test_1: {
+                            build(job: "tidb_ghpr_sqllogic_test_1", parameters: default_params, wait: true)
+                        },
+                        tidb_ghpr_sqllogic_test_2: {
+                            build(job: "tidb_ghpr_sqllogic_test_2", parameters: default_params, wait: true)
+                        },
+                        tidb_ghpr_tics_test: {
+                            build(job: "tidb_ghpr_tics_test", parameters: default_params, wait: true)
+                        },
 
-    stage("alert") {
-        container("python3") {
-            if ( env.REF != '' ) {
-                sh """
+                        // unit test
+                        // tidb_ghpr_unit_test: {
+                        //     build(job: "tidb_ghpr_unit_test", parameters: default_params, wait: true)
+                        // },
+                        // tidb_ghpr_check: {
+                        //     build(job: "tidb_ghpr_check", parameters: default_params, wait: true)
+                        // },
+                        // tidb_ghpr_check_2: {
+                        //     build(job: "tidb_ghpr_check_2", parameters: default_params, wait: true)
+                        // },
+                )
+            }
+        }
+
+        currentBuild.result = "SUCCESS"
+    } catch(Exception e) {
+        currentBuild.result = "FAILURE"
+        println "catch_exception Exception"
+        println e
+    } finally {
+        stage("alert") {
+            container("python3") {
+                if ( env.REF != '' ) {
+                    sh """
                 cat > env_param.conf <<EOF
 export BRANCH=${TIDB_BRANCH}
 export COMMIT_ID=${TIDB_COMMIT_ID}
@@ -107,21 +115,21 @@ export AUTHOR_EMAIL=${GEWT_AUTHOR_EMAIL}
 export PULL_ID=${GEWT_PULL_ID}
 EOF
                 """
-            }  else {
-                sh """
+                }  else {
+                    sh """
                 cat > env_param.conf <<EOF
 export BRANCH=${TIDB_BRANCH}
 export COMMIT_ID=${TIDB_COMMIT_ID}
 EOF
                 """
-            }
-            sh "cat env_param.conf"
-            sh "curl -LO ${FILE_SERVER_URL}/download/cicd/scripts/tidb_integration_test_ci_alert.py"
+                }
+                sh "cat env_param.conf"
+                sh "curl -LO ${FILE_SERVER_URL}/download/cicd/scripts/tidb_integration_test_ci_alert.py"
 
-            withCredentials([string(credentialsId: 'sre-bot-token', variable: 'GITHUB_API_TOKEN'),
-                             string(credentialsId: 'debug-feishu-alert-url-integration-test', variable: "FEISHU_ALERT_URL")
-            ]) {
-                sh '''#!/bin/bash
+                withCredentials([string(credentialsId: 'sre-bot-token', variable: 'GITHUB_API_TOKEN'),
+                                 string(credentialsId: 'debug-feishu-alert-url-integration-test', variable: "FEISHU_ALERT_URL")
+                ]) {
+                    sh '''#!/bin/bash
                 set +x
                 export GITHUB_API_TOKEN=${GITHUB_API_TOKEN}
                 export FEISHU_ALERT_URL=${FEISHU_ALERT_URL}
@@ -130,6 +138,7 @@ EOF
                 set -x
                 cat alert_feishu.log
                 '''
+                }
             }
         }
     }
