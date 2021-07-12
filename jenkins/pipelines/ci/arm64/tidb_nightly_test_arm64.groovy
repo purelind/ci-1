@@ -282,34 +282,34 @@ podTemplate(label: label,
             stage("Check") {
                 stage("Build & Test") {
                     container("golang") {
-                        dir("/home/jenkins/agent/git/tools") {
-                            if (!fileExists("/home/jenkins/agent/git/tools/bin/golangci-lint")) {
-                                container("golang") {
-                                    dir("/home/jenkins/agent/git/tools/") {
-                                        sh """
-                                            curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b ./bin ${golangciLintVer}
-                                        """
-                                    }
-                                }
-                            }
-                        }
+//                        dir("/home/jenkins/agent/git/tools") {
+//                            if (!fileExists("/home/jenkins/agent/git/tools/bin/golangci-lint")) {
+//                                container("golang") {
+//                                    dir("/home/jenkins/agent/git/tools/") {
+//                                        sh """
+//                                            curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b ./bin ${golangciLintVer}
+//                                        """
+//                                    }
+//                                }
+//                            }
+//                        }
                         dir("go/src/github.com/pingcap/tidb") {
-                            timeout(30) {
-                                sh """
-                                mkdir -p tools/bin
-                                cp /home/jenkins/agent/git/tools/bin/golangci-lint tools/bin/
-                                ls -al tools/bin || true
-                                # GOPROXY=http://goproxy.pingcap.net
-                                """
-                            }
+//                            timeout(30) {
+//                                sh """
+//                                mkdir -p tools/bin
+//                                cp /home/jenkins/agent/git/tools/bin/golangci-lint tools/bin/
+//                                ls -al tools/bin || true
+//                                # GOPROXY=http://goproxy.pingcap.net
+//                                """
+//                            }
                             try {
                                 if (branch == "master") {
                                     def builds = [:]
                                     builds["check"] = {
-                                        sh """
-                                        go version && ls -alh tools/bin/
-                                        ./tools/bin/golangci-lint --version
-                                        """
+//                                        sh """
+//                                        go version && ls -alh tools/bin/
+//                                        ./tools/bin/golangci-lint --version
+//                                        """
                                         sh "make check"
                                     }
                                     builds["test_part_1"] = {

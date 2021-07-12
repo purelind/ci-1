@@ -18,7 +18,7 @@ podTemplate(label: label,
         namespace: 'jenkins-tidb',
         containers: [
                 containerTemplate(
-                        name: 'golang', alwaysPullImage: false,
+                        name: 'rust', alwaysPullImage: false,
                         image: "${POD_RUST_DOCKER_IMAGE}", ttyEnabled: true,
                         resourceRequestCpu: '6000m', resourceRequestMemory: '8Gi',
                         resourceLimitCpu: '30000m', resourceLimitMemory: "20Gi",
