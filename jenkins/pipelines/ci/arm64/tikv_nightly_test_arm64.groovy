@@ -27,6 +27,8 @@ podTemplate(label: label,
                         resourceRequestCpu: '100m', resourceRequestMemory: '256Mi',
                 ),
         ],
+        volumes:[emptyDirVolume(mountPath: '/tmp', memory: true),
+                 emptyDirVolume(mountPath: '/home/jenkins', memory: true)],
         idleMinutes: 10
 ) {
     node(label) {
