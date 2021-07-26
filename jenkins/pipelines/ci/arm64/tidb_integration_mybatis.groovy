@@ -1,7 +1,7 @@
 properties([
         parameters([
                 string(
-                        defaultValue: '11bc9c139dbd4a73f20859142f97ac7cbca5ae58',
+                        defaultValue: '591ebdd9263694d88d6efc365dba14db9e8c7439',
                         name: 'TIDB_COMMIT',
                         trim: true
                 ),
@@ -32,14 +32,12 @@ def run_with_pod(arch, os, Closure body) {
     def pod_java_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.13_java:cached"
 
     if (arch == "x86") {
-        label = "tidb-integration-ddl"
-        unstash_file = "tidb-ddl-test-linux"
+        label = "tidb-integration-mybatis"
         pod_go_docker_image = "hub.pingcap.net/pingcap/centos7_golang-1.16:latest"
         jnlp_docker_image = "jenkins/inbound-agent:4.3-4"
     }
     if (arch == "arm64") {
-        label = "tidb-integration-ddl-arm64"
-        unstash_file = "tidb-ddl-test-linux-arm64"
+        label = "tidb-integration-mybatis-arm64"
         pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.16-arm64:latest"
         jnlp_docker_image = "hub.pingcap.net/jenkins/jnlp-slave-arm64:latest"
         cloud = "kubernetes-arm64"
@@ -75,12 +73,6 @@ def run_with_pod(arch, os, Closure body) {
             println "debug command:\nkubectl -n ${K8S_NAMESPACE} exec -ti ${NODE_NAME} bash"
             body()
         }
-    }
-}
-
-def run_build(arch, os, stash_name) {
-    run_with_pod(arch, os) {
-
     }
 }
 
@@ -149,19 +141,46 @@ __EOF__
 }
 
 
-parallel (
-        test_x86: {
-            stage("test") {
-                run_test("x86", "centos7")
-            }
-        },
-        test_arm64_centos7: {
-            stage("test") {
-                run_test("arm64", "centos7")
-            }
-        },
-        test_arm64_kylin_v10: {
-
-        },
-
-)
+// Start main
+try {
+    stage("x86") {
+        stage("x86 test") {
+            run_test("x86", "centos7")
+        }
+    }
+    stage("arm64") {
+        stage("arm64 test") {
+            run_test("arm64", "centos7")
+        }
+    }
+} catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
+    println "catch_exception FlowInterruptedException"
+    println e
+    // this ambiguous condition means a user probably aborted
+    currentBuild.result = "ABORTED"
+} catch (hudson.AbortException e) {
+    println "catch_exception AbortException"
+    println e
+    // this ambiguous condition means during a shell step, user probably aborted
+    if (e.getMessage().contains('script returned exit code 143')) {
+        currentBuild.result = "ABORTED"
+    } else {
+        currentBuild.result = "FAILURE"
+    }
+} catch (InterruptedException e) {
+    println "catch_exception InterruptedException"
+    println e
+    currentBuild.result = "ABORTED"
+} catch (Exception e) {
+    println "catch_exception Exception"
+    if (e.getMessage().equals("hasBeenTested")) {
+        currentBuild.result = "SUCCESS"
+    } else {
+        currentBuild.result = "FAILURE"
+        slackcolor = 'danger'
+        echo "${e}"
+    }
+}
+finally {
+    echo "Job finished..."
+}

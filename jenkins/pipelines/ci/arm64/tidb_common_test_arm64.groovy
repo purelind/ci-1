@@ -170,7 +170,7 @@ def run_build(arch, os) {
     }
 }
 
-def run_test(arch, os, tidb_test_url, tidb_url, tidb_done_url, STASH_FILE) {
+def run_test(arch, os, tidb_test_url, tidb_url, STASH_FILE) {
     def tests = [:]
 
     def run_with_log = { test_dir, log_path ->
@@ -607,41 +607,35 @@ try {
         node("master") {
             tidb_test_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tidb-test/${TIDB_TEST_BRANCH}/sha1"
             tidb_test_sha1 = sh(returnStdout: true, script: "curl ${tidb_test_refs}").trim()
-
+            tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/done"
         }
     }
 
-    parallel (
-//            test_x86: {
-//                def tidb_test_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb-test/${tidb_test_sha1}/centos7/tidb-test.tar.gz"
-//                def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
-//                def tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/done"
-//                def STASH_FILE = TIDB_TEST_STASH_FILE
-//
-//                stage("build") {
-//                    run_build("x86", "centos7")
-//                }
-//                stage("test") {
-//                    run_test("x86", "centos7", tidb_test_url, tidb_url, tidb_done_url, STASH_FILE)
-//                }
-//            },
-            test_arm64_centos7: {
-                def tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/done"
-                def tidb_test_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb-test/${tidb_test_sha1}/centos7/tidb-test-linux-arm64.tar.gz"
-                def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-linux-arm64.tar.gz"
-                def STASH_FILE = TIDB_TEST_ARM64_STASH_FILE
 
-                stage("build") {
-                    run_build("arm64", "centos7")
-                }
-                stage("test") {
-                    run_test("arm64", "centos7", tidb_test_url, tidb_url, tidb_done_url, STASH_FILE)
-                }
-            },
-            test_arm64_kylin_v10: {
+    stage("x86") {
+        def tidb_test_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb-test/${tidb_test_sha1}/centos7/tidb-test.tar.gz"
+        def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
+        def STASH_FILE = TIDB_TEST_STASH_FILE
 
-            },
-    )
+        stage("x86 build") {
+            run_build("x86", "centos7")
+        }
+        stage("x86 test") {
+            run_test("x86", "centos7", tidb_test_url, tidb_url, STASH_FILE)
+        }
+    }
+    stage("arm64") {
+        def tidb_test_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb-test/${tidb_test_sha1}/centos7/tidb-test-linux-arm64.tar.gz"
+        def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-linux-arm64.tar.gz"
+        def STASH_FILE = TIDB_TEST_ARM64_STASH_FILE
+
+        stage("arm64 build") {
+            run_build("arm64", "centos7")
+        }
+        stage("arm64 test") {
+            run_test("arm64", "centos7", tidb_test_url, tidb_url, STASH_FILE)
+        }
+    }
 } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
     println "catch_exception FlowInterruptedException"
     println e

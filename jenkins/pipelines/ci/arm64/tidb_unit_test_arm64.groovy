@@ -48,24 +48,24 @@ def run_with_pod(arch, os, Closure body) {
     def jnlp_docker_image = ""
     if (is_need_go1160) {
         if (arch == "x86") {
-            label = "tidb-integration-common"
+            label = "tidb-unit-test"
             pod_go_docker_image = "hub.pingcap.net/pingcap/centos7_golang-1.16:latest"
             jnlp_docker_image = "jenkins/inbound-agent:4.3-4"
         }
         if (arch == "arm64") {
-            label = "tidb-integration-common-arm64"
+            label = "tidb-unit-test-arm64"
             pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.16-arm64:latest"
             jnlp_docker_image = "hub.pingcap.net/jenkins/jnlp-slave-arm64:latest"
             cloud = "kubernetes-arm64"
         }
     } else {
         if (arch == "x86") {
-            label = "tidb-integration-common"
+            label = "tidb-unit-test"
             pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.13:latest"
             jnlp_docker_image = "jenkins/inbound-agent:4.3-4"
         }
         if (arch == "arm64") {
-            label = "tidb-integration-common-arm64"
+            label = "tidb-unit-test-arm64"
             pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.13-arm64:latest"
             jnlp_docker_image = "hub.pingcap.net/jenkins/jnlp-slave-arm64:latest"
             cloud = "kubernetes-arm64"
@@ -468,27 +468,22 @@ def run_test(arch, os) {
 
 // Start main
 try {
-    parallel (
-            test_x86: {
-//                stage("build") {
-//                    run_build("x86", "centos7")
-//                }
-//                stage("test") {
-//                    run_test("x86", "centos7")
-//                }
-            },
-            test_arm64_centos7: {
-                stage("build") {
-                    run_build("arm64", "centos7")
-                }
-                stage("test") {
-                    run_test("arm64", "centos7")
-                }
-            },
-            test_arm64_kylin_v10: {
-
-            },
-    )
+    stage("x86") {
+        stage("x86 build") {
+            run_build("x86", "centos7")
+        }
+        stage("x86 test") {
+            run_test("x86", "centos7")
+        }
+    }
+    stage("arm64") {
+        stage("arm64 build") {
+            run_build("arm64", "centos7")
+        }
+        stage("arm64 test") {
+            run_test("arm64", "centos7")
+        }
+    }
 } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
     println "catch_exception FlowInterruptedException"
     println e
