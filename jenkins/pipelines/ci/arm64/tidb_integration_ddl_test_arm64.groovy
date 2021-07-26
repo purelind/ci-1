@@ -1,7 +1,7 @@
 properties([
         parameters([
                 string(
-                        defaultValue: '029becc06b032412dbf00844e10a229598e9a956',
+                        defaultValue: '591ebdd9263694d88d6efc365dba14db9e8c7439',
                         name: 'TIDB_COMMIT',
                         trim: true
                 ),
@@ -34,10 +34,6 @@ BRANCH_NEED_GO1160 = ["master", "release-5.1"]
 
 ARCH = "x86" // [ x86 | arm64 ]
 OS = "linux" // [ centos7 | kylin_v10 | darwin ]
-
-tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
-tidb_done_url =  "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/done"
-
 
 def boolean isBranchMatched(List<String> branches, String targetBranch) {
     for (String item : branches) {
@@ -101,7 +97,6 @@ def run_with_pod(arch, os, Closure body) {
                             resourceRequestCpu: '100m', resourceRequestMemory: '256Mi',
                     ),
             ],
-
     ) {
         node(label) {
             println "debug command:\nkubectl -n ${K8S_NAMESPACE} exec -ti ${NODE_NAME} bash"
@@ -111,9 +106,14 @@ def run_with_pod(arch, os, Closure body) {
 
 }
 
-def run_build(arch, os, stash_name) {
+def run_build(arch, os) {
     run_with_pod(arch, os) {
         container("golang") {
+            def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
+            def tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/done"
+            if (arch == "arm64") {
+                tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-linux-arm64.tar.gz"
+                }
             dir("go/src/github.com/pingcap/tidb") {
                 def filepath = "builds/pingcap/tidb/ddl-test/centos7/${TIDB_COMMIT}/tidb-server-${os}-${arch}.tar"
                 timeout(5) {
@@ -131,13 +131,11 @@ def run_build(arch, os, stash_name) {
                     """
                 }
             }
-
-
         }
     }
 }
 
-def run_test(arch, os, stash_name) {
+def run_test(arch, os) {
     stage("${arch}  Integration DLL Test") {
         def tests = [:]
         def run = { test_dir, mytest, ddltest ->
@@ -145,38 +143,41 @@ def run_test(arch, os, stash_name) {
                 println "debug command:\nkubectl -n ${K8S_NAMESPACE} exec -ti ${NODE_NAME} bash"
                 def ws = pwd()
                 container("golang") {
+                    def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
+                    def tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/done"
+                    def tikv_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1"
+                    def tikv_sha1 = sh(returnStdout: true, script: "curl ${tikv_refs}").trim()
+                    def tikv_url="${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-server.tar.gz"
+                    def pd_refs = "${FILE_SERVER_URL}/download/refs/pingcap/pd/${PD_BRANCH}/sha1"
+                    def pd_sha1= sh(returnStdout: true, script: "curl ${pd_refs}").trim()
+                    def pd_url="${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-server.tar.gz"
+                    def tidb_test_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tidb-test/${TIDB_TEST_BRANCH}/sha1"
+                    def tidb_test_sha1 = sh(returnStdout: true, script: "curl ${tidb_test_refs}").trim()
+                    def tidb_test_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb-test/${tidb_test_sha1}/centos7/tidb-test.tar.gz"
+                    def tidb_tar_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/ddl-test/centos7/${TIDB_COMMIT}/tidb-server-${os}-${arch}.tar"
+                    if (arch == "arm64") {
+                        tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-linux-arm64.tar.gz"
+                        tikv_url = "${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-linux-arm64.tar.gz"
+                        pd_url = "${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-linux-arm64.tar.gz"
+                        tidb_test_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb-test/${tidb_test_sha1}/centos7/tidb-test-linux-arm64.tar.gz"
+                    }
                     dir("go/src/github.com/pingcap/tidb-test") {
                         timeout(10) {
-                            def tidb_test_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tidb-test/${TIDB_TEST_BRANCH}/sha1"
+                                   def dir = pwd()
                             sh """
-                        while ! curl --output /dev/null --silent --head --fail ${tidb_test_refs}; do sleep 10; done
-                        """
-                            def dir = pwd()
-                            sh """
-                        tidb_test_sha1=`curl "${FILE_SERVER_URL}/download/refs/pingcap/tidb-test/${TIDB_TEST_BRANCH}/sha1"`
-                        tidb_test_url="${FILE_SERVER_URL}/download/builds/pingcap/tidb-test/\${tidb_test_sha1}/centos7/tidb-test.tar.gz"
-
-                        tidb_tar_url="${FILE_SERVER_URL}/download/builds/pingcap/tidb/ddl-test/centos7/${TIDB_COMMIT}/tidb-server-${os}-${arch}.tar"
-
-                        tikv_sha1=`curl "${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1"`
-                        tikv_url="${FILE_SERVER_URL}/download/builds/pingcap/tikv/\${tikv_sha1}/centos7/tikv-server.tar.gz"
-
-                        pd_sha1=`curl "${FILE_SERVER_URL}/download/refs/pingcap/pd/${PD_BRANCH}/sha1"`
-                        pd_url="${FILE_SERVER_URL}/download/builds/pingcap/pd/\${pd_sha1}/centos7/pd-server.tar.gz"
-
-                        while ! curl --output /dev/null --silent --head --fail \${tidb_test_url}; do sleep 10; done
-                        curl \${tidb_test_url} | tar xz
+                        while ! curl --output /dev/null --silent --head --fail ${tidb_test_url}; do sleep 10; done
+                        curl ${tidb_test_url} | tar xz
 
                         cd ${test_dir}
 
-                        while ! curl --output /dev/null --silent --head --fail \${tikv_url}; do sleep 10; done
-                        curl \${tikv_url} | tar xz
+                        while ! curl --output /dev/null --silent --head --fail ${tikv_url}; do sleep 10; done
+                        curl ${tikv_url} | tar xz
 
-                        while ! curl --output /dev/null --silent --head --fail \${pd_url}; do sleep 10; done
-                        curl \${pd_url} | tar xz
+                        while ! curl --output /dev/null --silent --head --fail ${pd_url}; do sleep 10; done
+                        curl ${pd_url} | tar xz
 
                         mkdir -p ${dir}/../tidb/
-                        curl \${tidb_tar_url} | tar -xf - -C ${dir}/../
+                        curl ${tidb_tar_url} | tar -xf - -C ${dir}/../
                         mv ${dir}/../tidb/bin/tidb-server ./bin/ddltest_tidb-server
 
                         cd ${dir}/../tidb/
@@ -241,7 +242,6 @@ def run_test(arch, os, stash_name) {
                         }
                     }
                 }
-
             }
         }
 
@@ -274,23 +274,53 @@ def run_test(arch, os, stash_name) {
 }
 
 
-parallel (
-    test_x86: {
-        def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
-        def stash_name = "ddl-test-x86"
-        stage("build") {
-            run_build("x86", "centos7", stash_name)
+// Start main
+try {
+    stage("x86") {
+        stage("x86 build") {
+            run_build("x86", "centos7")
         }
-        stage("test") {
-            run_test("x86", "centos7", stash_name)
+        stage("x86 test") {
+            run_test("x86", "centos7")
         }
-    },
-    test_arm64_centos7: {
-        def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-server-linux-arm64.tar.gz"
-        def stash_name = "ddl-test-arm64"
-    },
-    test_arm64_kylin_v10: {
+    }
+    stage("arm64") {
+        stage("arm64 build") {
+            run_build("arm64", "centos7")
+        }
+        stage("arm64 test") {
+            run_test("arm64", "centos7")
+        }
+    }
 
-    },
-
-)
+} catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
+    println "catch_exception FlowInterruptedException"
+    println e
+    // this ambiguous condition means a user probably aborted
+    currentBuild.result = "ABORTED"
+} catch (hudson.AbortException e) {
+    println "catch_exception AbortException"
+    println e
+    // this ambiguous condition means during a shell step, user probably aborted
+    if (e.getMessage().contains('script returned exit code 143')) {
+        currentBuild.result = "ABORTED"
+    } else {
+        currentBuild.result = "FAILURE"
+    }
+} catch (InterruptedException e) {
+    println "catch_exception InterruptedException"
+    println e
+    currentBuild.result = "ABORTED"
+} catch (Exception e) {
+    println "catch_exception Exception"
+    if (e.getMessage().equals("hasBeenTested")) {
+        currentBuild.result = "SUCCESS"
+    } else {
+        currentBuild.result = "FAILURE"
+        slackcolor = 'danger'
+        echo "${e}"
+    }
+}
+finally {
+    echo "Job finished..."
+}

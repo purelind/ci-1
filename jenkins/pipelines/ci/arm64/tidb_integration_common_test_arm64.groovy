@@ -1,7 +1,7 @@
 properties([
         parameters([
                 string(
-                        defaultValue: '029becc06b032412dbf00844e10a229598e9a956',
+                        defaultValue: '591ebdd9263694d88d6efc365dba14db9e8c7439',
                         name: 'TIDB_COMMIT',
                         trim: true
                 ),
@@ -35,11 +35,8 @@ BRANCH_NEED_GO1160 = ["master", "release-5.1"]
 ARCH = "x86" // [ x86 | arm64 ]
 OS = "linux" // [ centos7 | kylin_v10 | darwin ]
 
-tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
-tidb_done_url =  "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/done"
-
-def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
-def tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/done"
+tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
+tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/done"
 
 def boolean isBranchMatched(List<String> branches, String targetBranch) {
     for (String item : branches) {
@@ -119,7 +116,9 @@ def run_build(arch, os) {
             def tidb_test_sha1 = sh(returnStdout: true, script: "curl ${tidb_test_refs}").trim()
             def tidb_test_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb-test/${tidb_test_sha1}/centos7/tidb-test.tar.gz"
             if (arch == "arm64") {
-                tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server-linux-arm64.tar.gz"
+                tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-linux-arm64.tar.gz"
+                tidb_test_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb-test/${tidb_test_sha1}/centos7/tidb-test-linux-arm64.tar.gz"
+
             }
             dir("go/src/github.com/pingcap/tidb") {
                 timeout(10) {
@@ -148,15 +147,28 @@ def run_build(arch, os) {
                 }
             }
 
-            stash includes: "go/src/github.com/pingcap/tidb-test/_helper.sh", name: "helper"
-            stash includes: "go/src/github.com/pingcap/tidb-test/tidb_test/**", name: "tidb_test"
-            stash includes: "go/src/github.com/pingcap/tidb-test/randgen-test/**", name: "randgen-test"
-            stash includes: "go/src/github.com/pingcap/tidb-test/go-sql-test/**", name: "go-sql-test"
-            stash includes: "go/src/github.com/pingcap/tidb-test/go.*,go/src/github.com/pingcap/tidb-test/util/**,go/src/github.com/pingcap/tidb-test/bin/**", name: "tidb-test"
-            stash includes: "go/src/github.com/pingcap/tidb-test/_vendor/**", name: "tidb-test-vendor"
-            stash includes: "go/src/github.com/pingcap/tidb-test/mysql_test/**", name: "mysql_test"
-            stash includes: "go/src/github.com/pingcap/tidb-test/analyze_test/**", name: "analyze_test"
-            stash includes: "go/src/github.com/pingcap/tidb-test/gorm_test/**", name: "gorm_test"
+            if (arch == "x86") {
+                stash includes: "go/src/github.com/pingcap/tidb-test/_helper.sh", name: "helper"
+                stash includes: "go/src/github.com/pingcap/tidb-test/tidb_test/**", name: "tidb_test"
+                stash includes: "go/src/github.com/pingcap/tidb-test/randgen-test/**", name: "randgen-test"
+                stash includes: "go/src/github.com/pingcap/tidb-test/go-sql-test/**", name: "go-sql-test"
+                stash includes: "go/src/github.com/pingcap/tidb-test/go.*,go/src/github.com/pingcap/tidb-test/util/**,go/src/github.com/pingcap/tidb-test/bin/**", name: "tidb-test"
+                stash includes: "go/src/github.com/pingcap/tidb-test/_vendor/**", name: "tidb-test-vendor"
+                stash includes: "go/src/github.com/pingcap/tidb-test/mysql_test/**", name: "mysql_test"
+                stash includes: "go/src/github.com/pingcap/tidb-test/analyze_test/**", name: "analyze_test"
+                stash includes: "go/src/github.com/pingcap/tidb-test/gorm_test/**", name: "gorm_test"
+            }
+            if (arch == "arm64") {
+                stash includes: "go/src/github.com/pingcap/tidb-test/_helper.sh", name: "helper_arm64"
+                stash includes: "go/src/github.com/pingcap/tidb-test/tidb_test/**", name: "tidb_test_arm64"
+                stash includes: "go/src/github.com/pingcap/tidb-test/randgen-test/**", name: "randgen-test_arm64"
+                stash includes: "go/src/github.com/pingcap/tidb-test/go-sql-test/**", name: "go-sql-test_arm64"
+                stash includes: "go/src/github.com/pingcap/tidb-test/go.*,go/src/github.com/pingcap/tidb-test/util/**,go/src/github.com/pingcap/tidb-test/bin/**", name: "tidb-test_arm64"
+                stash includes: "go/src/github.com/pingcap/tidb-test/_vendor/**", name: "tidb-test-vendor_arm64"
+                stash includes: "go/src/github.com/pingcap/tidb-test/mysql_test/**", name: "mysql_test_arm64"
+                stash includes: "go/src/github.com/pingcap/tidb-test/analyze_test/**", name: "analyze_test_arm64"
+                stash includes: "go/src/github.com/pingcap/tidb-test/gorm_test/**", name: "gorm_test_arm64"
+            }
         }
     }
 }
@@ -169,33 +181,43 @@ def run_test(arch, os) {
             run_with_pod(arch, os) {
                 def ws = pwd()
                 deleteDir()
-                unstash "tidb-test"
-                unstash "tidb-test-vendor"
-                unstash "helper"
-                unstash "${test_dir}"
+                if ( arch == "x86" ) {
+                    unstash "tidb-test"
+                    unstash "tidb-test-vendor"
+                    unstash "helper"
+                    unstash "${test_dir}"
+                }
+                if (arch == "arm64") {
+                    unstash "tidb-test_arm64"
+                    unstash "tidb-test-vendor_arm64"
+                    unstash "helper_arm64"
+                    unstash "${test_dir}_arm64"
+                }
 
                 dir("go/src/github.com/pingcap/tidb-test/${test_dir}") {
                     container("golang") {
                         def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
                         def tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/done"
+                        def tikv_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1"
+                        def tikv_sha1 = sh(returnStdout: true, script: "curl ${tikv_refs}").trim()
+                        def tikv_url="${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-server.tar.gz"
+                        def pd_refs = "${FILE_SERVER_URL}/download/refs/pingcap/pd/${PD_BRANCH}/sha1"
+                        def pd_sha1= sh(returnStdout: true, script: "curl ${pd_refs}").trim()
+                        def pd_url="${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-server.tar.gz"
                         if (arch == "arm64") {
-                            tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server-linux-arm64.tar.gz"
+                            tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-linux-arm64.tar.gz"
+                            tikv_url = "${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-linux-arm64.tar.gz"
+                            pd_url = "${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-linux-arm64.tar.gz"
                         }
 
                         timeout(10) {
                             retry(3){
                                 sh """
-	                            tikv_sha1=`curl "${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1"`
-	                            tikv_url="${FILE_SERVER_URL}/download/builds/pingcap/tikv/\${tikv_sha1}/centos7/tikv-server.tar.gz"
+	                            while ! curl --output /dev/null --silent --head --fail ${tikv_url}; do sleep 1; done
+	                            curl ${tikv_url} | tar xz bin
 	
-	                            pd_sha1=`curl "${FILE_SERVER_URL}/download/refs/pingcap/pd/${PD_BRANCH}/sha1"`
-	                            pd_url="${FILE_SERVER_URL}/download/builds/pingcap/pd/\${pd_sha1}/centos7/pd-server.tar.gz"
-	
-	                            while ! curl --output /dev/null --silent --head --fail \${tikv_url}; do sleep 1; done
-	                            curl \${tikv_url} | tar xz bin
-	
-	                            while ! curl --output /dev/null --silent --head --fail \${pd_url}; do sleep 1; done
-	                            curl \${pd_url} | tar xz bin
+	                            while ! curl --output /dev/null --silent --head --fail ${pd_url}; do sleep 1; done
+	                            curl ${pd_url} | tar xz bin
 	
 	                            mkdir -p ./tidb-src
 	                            while ! curl --output /dev/null --silent --head --fail ${tidb_done_url}; do sleep 1; done
@@ -262,33 +284,42 @@ def run_test(arch, os) {
             run_with_pod(arch, os) {
                 def ws = pwd()
 
-                unstash "tidb-test"
-                unstash "tidb-test-vendor"
-                unstash "helper"
-                unstash "${test_dir}"
+                if ( arch == "x86" ) {
+                    unstash "tidb-test"
+                    unstash "tidb-test-vendor"
+                    unstash "helper"
+                    unstash "${test_dir}"
+                }
+                if (arch == "arm64") {
+                    unstash "tidb-test_arm64"
+                    unstash "tidb-test-vendor_arm64"
+                    unstash "helper_arm64"
+                    unstash "${test_dir}_arm64"
+                }
 
                 dir("go/src/github.com/pingcap/tidb-test/${test_dir}") {
+                    def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
+                    def tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/done"
+                    def tikv_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1"
+                    def tikv_sha1 = sh(returnStdout: true, script: "curl ${tikv_refs}").trim()
+                    def tikv_url="${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-server.tar.gz"
+                    def pd_refs = "${FILE_SERVER_URL}/download/refs/pingcap/pd/${PD_BRANCH}/sha1"
+                    def pd_sha1= sh(returnStdout: true, script: "curl ${pd_refs}").trim()
+                    def pd_url="${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-server.tar.gz"
+                    if (arch == "arm64") {
+                        tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-linux-arm64.tar.gz"
+                        tikv_url = "${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-linux-arm64.tar.gz"
+                        pd_url = "${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-linux-arm64.tar.gz"
+                    }
                     container("golang") {
-                        def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
-                        def tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/done"
-                        if (arch == "arm64") {
-                            tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server-linux-arm64.tar.gz"
-                        }
-
                         timeout(10) {
                             retry(3){
                                 sh """
-	                            tikv_sha1=`curl "${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1"`
-	                            tikv_url="${FILE_SERVER_URL}/download/builds/pingcap/tikv/\${tikv_sha1}/centos7/tikv-server.tar.gz"
+	                            while ! curl --output /dev/null --silent --head --fail ${tikv_url}; do sleep 15; done
+	                            curl ${tikv_url} | tar xz
 	
-	                            pd_sha1=`curl "${FILE_SERVER_URL}/download/refs/pingcap/pd/${PD_BRANCH}/sha1"`
-	                            pd_url="${FILE_SERVER_URL}/download/builds/pingcap/pd/\${pd_sha1}/centos7/pd-server.tar.gz"
-	
-	                            while ! curl --output /dev/null --silent --head --fail \${tikv_url}; do sleep 15; done
-	                            curl \${tikv_url} | tar xz
-	
-	                            while ! curl --output /dev/null --silent --head --fail \${pd_url}; do sleep 15; done
-	                            curl \${pd_url} | tar xz
+	                            while ! curl --output /dev/null --silent --head --fail ${pd_url}; do sleep 15; done
+	                            curl ${pd_url} | tar xz
 	
 	                            mkdir -p ./tidb-src
 	                            while ! curl --output /dev/null --silent --head --fail ${tidb_done_url}; do sleep 15; done
@@ -393,13 +424,20 @@ def run_test(arch, os) {
                 def ws = pwd()
 
                 dir("go/src/github.com/pingcap/tidb") {
+                    def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
+                    def tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/done"
+                    def tikv_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1"
+                    def tikv_sha1 = sh(returnStdout: true, script: "curl ${tikv_refs}").trim()
+                    def tikv_url="${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-server.tar.gz"
+                    def pd_refs = "${FILE_SERVER_URL}/download/refs/pingcap/pd/${PD_BRANCH}/sha1"
+                    def pd_sha1= sh(returnStdout: true, script: "curl ${pd_refs}").trim()
+                    def pd_url="${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-server.tar.gz"
+                    if (arch == "arm64") {
+                        tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-linux-arm64.tar.gz"
+                        tikv_url = "${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-linux-arm64.tar.gz"
+                        pd_url = "${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-linux-arm64.tar.gz"
+                    }
                     container("golang") {
-                        def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
-                        def tidb_done_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/done"
-                        if (arch == "arm64") {
-                            tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${TIDB_COMMIT}/centos7/tidb-server-linux-arm64.tar.gz"
-                        }
-
                         try {
                             timeout(10) {
                                 retry(3){
@@ -457,22 +495,22 @@ def run_test(arch, os) {
 
 // Start main
 try {
-    parallel (
-        test_x86: {
-            stage("build") {
-                run_build("x86", "centos7")
-            }
-            stage("test") {
-                run_test("x86", "centos7")
-            }
-        },
-        test_arm64_centos7: {
-
-        },
-        test_arm64_kylin_v10: {
-
-        },
-    )
+    stage("x86") {
+        stage("x86 build") {
+            run_build("x86", "centos7")
+        }
+        stage("x86 test") {
+            run_test("x86", "centos7")
+        }
+    }
+    stage("arm64") {
+        stage("arm64 build") {
+            run_build("arm64", "centos7")
+        }
+        stage("arm64 test") {
+            run_test("arm64", "centos7")
+        }
+    }
 } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
     println "catch_exception FlowInterruptedException"
     println e

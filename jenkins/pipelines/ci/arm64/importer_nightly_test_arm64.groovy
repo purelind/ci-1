@@ -85,6 +85,7 @@ podTemplate(label: label,
                                 source /opt/rh/devtoolset-8/enable
                             fi
                             ROCKSDB_SYS_SSE=0 make test
+                            """
                         }
                     }
                 }

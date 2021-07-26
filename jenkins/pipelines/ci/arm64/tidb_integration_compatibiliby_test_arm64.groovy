@@ -123,6 +123,8 @@ def run_build(arch, os) {
             def tidb_test_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb-test/${tidb_test_sha1}/centos7/tidb-test.tar.gz"
             if (arch == "arm64") {
                 tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${ghprbActualCommit}/centos7/tidb-server-linux-arm64.tar.gz"
+                tidb_test_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb-test/${tidb_test_sha1}/centos7/tidb-test.tar.gz"
+
             }
 
             dir("go/src/github.com/pingcap/tidb") {
@@ -158,9 +160,6 @@ def run_test(arch, os) {
             container("golang") {
                 def tidb_old_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tidb/${TIDB_OLD_BRANCH}/sha1"
                 def tidb_old_sha1 = sh(returnStdout: true, script: "curl ${tidb_old_refs}").trim()
-                sh """
-                time curl ${tidb_old_refs}
-                """
                 def tidb_old_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${tidb_old_sha1}/centos7/tidb-server.tar.gz"
 
                 def tikv_refs = "${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1"
@@ -172,9 +171,9 @@ def run_test(arch, os) {
                 def pd_url = "${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-server.tar.gz"
 
                 if (arch == "arm64") {
-                    tidb_old_url = ""
-                    tikv_url = ""
-                    pd_url = ""
+                    tidb_old_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${tidb_old_sha1}/centos7/tidb-linux-arm64.tar.gz"
+                    tikv_url = "${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-linux-arm64.tar.gz"
+                    pd_url = "${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-linux-arm64.tar.gz"
                 }
 
                 timeout(10) {
