@@ -1,7 +1,7 @@
 properties([
         parameters([
                 string(
-                        defaultValue: '029becc06b032412dbf00844e10a229598e9a956',
+                        defaultValue: '591ebdd9263694d88d6efc365dba14db9e8c7439',
                         name: 'TIDB_COMMIT',
                         trim: true
                 ),
