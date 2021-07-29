@@ -1,8 +1,8 @@
 properties([
         parameters([
                 string(
-                        defaultValue: '591ebdd9263694d88d6efc365dba14db9e8c7439',
-                        name: 'TIDB_COMMIT',
+                        defaultValue: '9e157278c7464237783bf11adcedcd08d7f0d580',
+                        name: 'PD_COMMIT',
                         trim: true
                 ),
                 string(
@@ -16,29 +16,17 @@ properties([
 echo "release test: ${params.containsKey("release_test")}"
 if (params.containsKey("release_test")) {
     RELEASE_BRANCH = params.getOrDefault("release_test__release_branch", "")
-    TIDB_COMMIT = params.getOrDefault("release_test__tidb_commit", "")
+    PD_COMMIT = params.getOrDefault("release_test__pd_commit", "")
 }
 
-TIKV_BRANCH = RELEASE_BRANCH
 PD_BRANCH = RELEASE_BRANCH
-TIDB_TEST_BRANCH = RELEASE_BRANCH
-TIDB_BRANCH = RELEASE_BRANCH
-TIDB_OLD_BRANCH = RELEASE_BRANCH
 
-if (params.containsKey("release_test") && params.triggered_by_upstream_ci == null) {
-    TIKV_BRANCH = params.release_test__tikv_commit
-    PD_BRANCH = params.release_test__pd_commit
-    TIDB_OLD_BRANCH = params.getOrDefault('release_test__tidb_old_commit', TIDB_COMMIT)
-}
 
 K8S_NAMESPACE = "jenkins-tidb"
 BRANCH_NEED_GO1160 = ["master", "release-5.1"]
 
 ARCH = "x86" // [ x86 | arm64 ]
 OS = "linux" // [ centos7 | kylin_v10 | darwin ]
-
-tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/tidb-server.tar.gz"
-tidb_done_url =  "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${TIDB_COMMIT}/centos7/done"
 
 
 def boolean isBranchMatched(List<String> branches, String targetBranch) {
@@ -60,24 +48,24 @@ def run_with_pod(arch, os, Closure body) {
     def jnlp_docker_image = ""
     if (is_need_go1160) {
         if (arch == "x86") {
-            label = "tidb-integration-common"
+            label = "pd-test"
             pod_go_docker_image = "hub.pingcap.net/pingcap/centos7_golang-1.16:latest"
             jnlp_docker_image = "jenkins/inbound-agent:4.3-4"
         }
         if (arch == "arm64") {
-            label = "tidb-integration-common-arm64"
+            label = "pd-test-arm64"
             pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.16-arm64:latest"
             jnlp_docker_image = "hub.pingcap.net/jenkins/jnlp-slave-arm64:latest"
             cloud = "kubernetes-arm64"
         }
     } else {
         if (arch == "x86") {
-            label = "tidb-integration-common"
+            label = "pd-test"
             pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.13:latest"
             jnlp_docker_image = "jenkins/inbound-agent:4.3-4"
         }
         if (arch == "arm64") {
-            label = "tidb-integration-common-arm64"
+            label = "pd-test-arm64"
             pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.13-arm64:latest"
             jnlp_docker_image = "hub.pingcap.net/jenkins/jnlp-slave-arm64:latest"
             cloud = "kubernetes-arm64"
@@ -99,7 +87,6 @@ def run_with_pod(arch, os, Closure body) {
                             resourceRequestCpu: '100m', resourceRequestMemory: '256Mi',
                     ),
             ],
-
     ) {
         node(label) {
             println "debug command:\nkubectl -n ${K8S_NAMESPACE} exec -ti ${NODE_NAME} bash"
@@ -111,12 +98,108 @@ def run_with_pod(arch, os, Closure body) {
 
 def run_build(arch, os) {
     run_with_pod(arch, os) {
+        def ws = pwd()
+        deleteDir()
+        dir("go/src/github.com/pingcap/pd") {
+            container("golang") {
+                def pd_url = "${FILE_SERVER_URL}/download/builds/pingcap/pd/pr/${PD_COMMIT}/centos7/pd-server.tar.gz"
+                if (arch == "arm64") {
+                    pd_url = "${FILE_SERVER_URL}/download/builds/pingcap/pd/${PD_COMMIT}/centos7/pd-linux-arm64.tar.gz"
+                }
 
+                timeout(30) {
+                    sh """
+                        pwd
+                        while ! curl --output /dev/null --silent --head --fail ${pd_url}; do sleep 15; done
+                        sleep 5
+                        curl ${pd_url} | tar xz
+                        rm -rf ./bin
+                        export GOPATH=${ws}/go
+                        # export GOPROXY=http://goproxy.pingcap.net
+                        go list ./...
+                        go list ./... > packages.list
+                        cat packages.list
+                        split packages.list -n r/5 packages_unit_ -a 1 --numeric-suffixes=1
+                        echo 1
+                        cat packages_unit_1
+                        """
+
+                    if (PD_BRANCH == "release-3.0" || PD_BRANCH == "release-3.1") {
+                        sh """
+                            make retool-setup
+                            make failpoint-enable
+                            """
+                    } else {
+                        sh """
+                            make failpoint-enable
+                            make deadlock-enable
+    						"""
+                    }
+                }
+            }
+        }
+
+        stash includes: "go/src/github.com/pingcap/pd/**", name: "pd-${os}-${arch}"
     }
 }
 
 def run_test(arch, os) {
+    def run_unit_test = { chunk_suffix ->
+        run_with_pod(arch, os) {
+            def ws = pwd()
+            deleteDir()
+            unstash "pd-${os}-${arch}"
 
+            dir("go/src/github.com/pingcap/pd") {
+                container("golang") {
+                    timeout(30) {
+                        sh """
+                               set +e
+                               killall -9 -r tidb-server
+                               killall -9 -r tikv-server
+                               killall -9 -r pd-server
+                               rm -rf /tmp/pd
+                               set -e
+                               cat packages_unit_${chunk_suffix}
+                            """
+                        if (fileExists("go.mod")) {
+                            sh """
+                               mkdir -p \$GOPATH/pkg/mod && mkdir -p ${ws}/go/pkg && ln -sfT \$GOPATH/pkg/mod ${ws}/go/pkg/mod || true
+                               GOPATH=${ws}/go CGO_ENABLED=1 GO111MODULE=on go test -p 1 -race -cover \$(cat packages_unit_${chunk_suffix})
+                               """
+                        } else {
+                            sh """
+                               GOPATH=${ws}/go CGO_ENABLED=1 GO111MODULE=off go test -race -cover \$(cat packages_unit_${chunk_suffix})
+                               """
+                        }
+                    }
+                }
+            }
+        }
+    }
+    def tests = [:]
+
+    tests["Unit Test Chunk #1"] = {
+        run_unit_test(1)
+    }
+
+    tests["Unit Test Chunk #2"] = {
+        run_unit_test(2)
+    }
+
+    tests["Unit Test Chunk #3"] = {
+        run_unit_test(3)
+    }
+
+    tests["Unit Test Chunk #4"] = {
+        run_unit_test(4)
+    }
+
+    tests["Unit Test Chunk #5"] = {
+        run_unit_test(5)
+    }
+
+    parallel tests
 }
 
 
@@ -169,4 +252,3 @@ try {
 finally {
     echo "Job finished..."
 }
-
