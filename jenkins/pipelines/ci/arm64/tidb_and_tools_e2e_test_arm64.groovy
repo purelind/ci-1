@@ -148,8 +148,8 @@ def run_test(arch, os) {
                     }
 
                     if (arch == "x86") {
-                        sh "curl ${FILE_SERVER_URL}/download/builds/pingcap/ticdc/${cdc_sha1}/centos7/ticdc-linux-amd64.tar.gz | tar xz"
                         sh """
+                        curl ${FILE_SERVER_URL}/download/builds/pingcap/ticdc/${cdc_sha1}/centos7/ticdc-linux-amd64.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/tidb/${tidb_sha1}/centos7/tidb-server.tar.gz | tar xz bin
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-server.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-server.tar.gz | tar xz
@@ -157,12 +157,13 @@ def run_test(arch, os) {
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/br/${br_sha1}/centos7/br.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/tidb-tools/${tools_sha1}/centos7/tidb-tools.tar.gz | tar xz bin
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/tiflash/${tiflash_branch_sha1}/centos7/tiflash.tar.gz | tar xz
+                        mv ticdc-linux-amd64/bin/cdc bin/
                         cp -R /home/jenkins/bin/go-tpc bin/
                         """
                     }
                     if (arch == "arm64") {
-                        sh "curl ${FILE_SERVER_URL}/download/builds/pingcap/ticdc/${cdc_sha1}/centos7/ticdc-linux-arm64.tar.gz | tar xz"
                         sh """
+                        curl ${FILE_SERVER_URL}/download/builds/pingcap/ticdc/${cdc_sha1}/centos7/ticdc-linux-arm64.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/test/tidb/${tidb_sha1}/centos7/tidb-linux-arm64.tar.gz | tar xz bin
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/test/tikv/${tikv_sha1}/centos7/tikv-linux-arm64.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/test/pd/${pd_sha1}/centos7/pd-linux-arm64.tar.gz | tar xz
