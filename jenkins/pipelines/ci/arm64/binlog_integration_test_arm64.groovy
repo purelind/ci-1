@@ -204,26 +204,25 @@ def run_build(arch, os) {
                     tidb_tools_file = "${FILE_SERVER_URL}/download/builds/pingcap/test/tidb-tools/${tidb_tools_sha1}/centos7/tidb-tools-linux-arm64.tar.gz"
                 }
 
+                if (os == "centos7-tidb-tools-v2.1.6") {
                     tidb_tools_file = "https://download.pingcap.org/tidb-tools-v2.1.6-linux-amd64.tar.gz"
                     sh """
                     curl ${tidb_tools_file} | tar xz
                     mkdir -p ./bin
-                    mv tidb-tools-v2.1.6-linux-amd64/bin/binlogctl bin/
                     mv tidb-tools-v2.1.6-linux-amd64/bin/sync_diff_inspector bin/
                     rm -r tidb-tools-v2.1.6-linux-amd64 || true
                     mv ${ws}/bin/* ./bin/
                     ls -l ./bin
                     """
-//                    sh """
-//                    curl ${tidb_tools_file} | tar xz
-//                    rm -f bin/{ddl_checker,importer}
-//                    mv ${ws}/bin/* ./bin/
-//                    ls -l ./bin
-//                    """
-
-
-
-
+                } else {
+                    sh """
+                    curl ${tidb_tools_file} | tar xz
+                    ls -l ./bin
+                    rm -f bin/{ddl_checker,importer}
+                    mv ${ws}/bin/* ./bin/
+                    ls -l ./bin
+                    """
+                }
             }
 
             stash includes: "go/src/github.com/pingcap/tidb-tools/bin/**", name: "binaries-${os}-${arch}"
@@ -275,22 +274,36 @@ def run_test(arch, os) {
 
 // Start main
 try {
-    stage("x86") {
-        stage("build") {
-            run_build("x86", "centos7")
-        }
-        stage("test") {
-            run_test("x86", "centos7")
-        }
-    }
-//    stage("arm64") {
-//        stage("arm64 build") {
-//            run_build("arm64", "centos7")
-//        }
-//        stage("arm64 test") {
-//            run_test("arm64", "centos7")
-//        }
-//    }
+
+    parallel(
+            "x86": {
+                stage("build") {
+                    run_build("x86", "centos7")
+                }
+                stage("test") {
+                    run_test("x86", "centos7")
+                }
+            },
+            "x86-old-tidb-tools-v2.1.6": {
+                stage("build") {
+                    run_build("x86", "centos7-tidb-tools-v2.1.6")
+                }
+                stage("test") {
+                    run_test("x86", "centos7-tidb-tools-v2.1.6")
+                }
+            },
+            "arm64": {
+                stage("build") {
+                    run_build("arm64", "centos7")
+                }
+                stage("test") {
+                    run_test("arm64", "centos7")
+                }
+            }
+
+
+    )
+    currentBuild.result = "SUCCESS"
 } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
     println "catch_exception FlowInterruptedException"
     println e
