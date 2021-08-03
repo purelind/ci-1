@@ -1,7 +1,7 @@
 properties([
         parameters([
                 string(
-                        defaultValue: '77fb0867d626c8b823b95be9ab293fcf60878cba',
+                        defaultValue: '8d1aa3c53a9c783d39b7b9618d9dee2f5450c76e',
                         name: 'BINLOG_COMMIT',
                         trim: true
                 ),
@@ -183,9 +183,9 @@ def run_build(arch, os) {
             def tidb_sha1 = sh(returnStdout: true, script: "curl ${FILE_SERVER_URL}/download/refs/pingcap/tidb/${TIDB_BRANCH}/sha1").trim()
             def tidb_file = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${tidb_sha1}/centos7/tidb-server.tar.gz"
             if (arch == "arm64") {
-                tikv_file = "${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-linux-arm64.tar.gz"
-                pd_file = "${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-linux-arm64.tar.gz"
-                tidb_file = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/${tidb_sha1}/centos7/tidb-linux-arm64.tar.gz"
+                tikv_file = "${FILE_SERVER_URL}/download/builds/pingcap/test/tikv/${tikv_sha1}/centos7/tikv-linux-arm64.tar.gz"
+                pd_file = "${FILE_SERVER_URL}/download/builds/pingcap/test/pd/${pd_sha1}/centos7/pd-linux-arm64.tar.gz"
+                tidb_file = "${FILE_SERVER_URL}/download/builds/pingcap/test/tidb/${tidb_sha1}/centos7/tidb-linux-arm64.tar.gz"
             }
 
             // download binary file tikv / pd / tidb

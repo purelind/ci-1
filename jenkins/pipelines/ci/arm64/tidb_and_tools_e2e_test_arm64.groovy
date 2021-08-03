@@ -86,8 +86,8 @@ def run_with_pod(arch, os, Closure body) {
                     containerTemplate(
                             name: 'golang', alwaysPullImage: false,
                             image: "${pod_go_docker_image}", ttyEnabled: true, privileged: true,
-                            resourceRequestCpu: '2000m', resourceRequestMemory: '4Gi',
-                            resourceLimitCpu: '30000m', resourceLimitMemory: "20Gi",
+                            resourceRequestCpu: '8000m', resourceRequestMemory: '20Gi',
+                            resourceLimitCpu: '30000m', resourceLimitMemory: "100Gi",
                             command: '/bin/sh -c', args: 'cat',
                     ),
                     containerTemplate(
@@ -136,18 +136,19 @@ def run_test(arch, os) {
                     def tikv_sha1 = get_commit_hash("tikv", TIKV_BRANCH_OR_COMMIT)
                     def pd_sha1 = get_commit_hash("pd", PD_BRANCH_OR_COMMIT)
                     def binlog_sha1 = get_commit_hash("tidb-binlog", BINLOG_BRANCH_OR_COMMIT)
-                    def br_sha1 = BR_BRANCH_AND_COMMIT
-                    if (br_sha1 == "master" || br_sha1 == "") {
-                        br_sha1 = "master/" + get_commit_hash("br", "master")
-                    }
+                    def br_sha1 = ""
+
                     def cdc_sha1 = get_commit_hash("ticdc", TICDC_BRANCH_OR_COMMIT)
                     def tools_sha1 = get_commit_hash("tidb-tools", TOOLS_BRANCH_OR_COMMIT)
-                    def tiflash_branch_sha1 = TIFLASH_BRANCH_AND_COMMIT
-                    if (tiflash_branch_sha1 == "master" || tiflash_branch_sha1 == "") {
-                        tiflash_branch_sha1 = "master/" + get_commit_hash("tiflash", "master")
-                    }
+                    def tiflash_branch_sha1 = ""
 
                     if (arch == "x86") {
+                        if (BR_BRANCH_AND_COMMIT == "master" || BR_BRANCH_AND_COMMIT == "release-5.1" ) {
+                            br_sha1 = "master/" + get_commit_hash("br", BR_BRANCH_AND_COMMIT)
+                        }
+                        if (TIFLASH_BRANCH_AND_COMMIT == "master" || TIFLASH_BRANCH_AND_COMMIT == "release-5.1") {
+                            tiflash_branch_sha1 = "master/" + get_commit_hash("tiflash", TIFLASH_BRANCH_AND_COMMIT)
+                        }
                         sh """
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/ticdc/${cdc_sha1}/centos7/ticdc-linux-amd64.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/tidb/${tidb_sha1}/centos7/tidb-server.tar.gz | tar xz bin
@@ -162,16 +163,28 @@ def run_test(arch, os) {
                         """
                     }
                     if (arch == "arm64") {
+                        if (BR_BRANCH_AND_COMMIT == "master" || BR_BRANCH_AND_COMMIT == "release-5.1") {
+                            br_sha1 = get_commit_hash("br", BR_BRANCH_AND_COMMIT)
+                        } else {
+                            br_sha1 = BR_BRANCH_AND_COMMIT.split("/")[1]
+                        }
+                        if (TIFLASH_BRANCH_AND_COMMIT == "master" || TIFLASH_BRANCH_AND_COMMIT == "release-5.1" ) {
+                            tiflash_branch_sha1 = get_commit_hash("tiflash", TIFLASH_BRANCH_AND_COMMIT)
+                        } else {
+                            tiflash_branch_sha1 = TIFLASH_BRANCH_AND_COMMIT.split("/")[1]
+                        }
+
                         sh """
-                        curl ${FILE_SERVER_URL}/download/builds/pingcap/ticdc/${cdc_sha1}/centos7/ticdc-linux-arm64.tar.gz | tar xz
+                        curl ${FILE_SERVER_URL}/download/builds/pingcap/test/ticdc/${cdc_sha1}/centos7/ticdc-linux-arm64.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/test/tidb/${tidb_sha1}/centos7/tidb-linux-arm64.tar.gz | tar xz bin
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/test/tikv/${tikv_sha1}/centos7/tikv-linux-arm64.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/test/pd/${pd_sha1}/centos7/pd-linux-arm64.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/test/tidb-binlog/${binlog_sha1}/centos7/tidb-binlog-linux-arm64.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/test/br/${br_sha1}/centos7/br-linux-arm64.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/test/tidb-tools/${tools_sha1}/centos7/tidb-tools-linux-arm64.tar.gz | tar xz bin
-                        curl ${FILE_SERVER_URL}/download/builds/pingcap/test/tiflash/${tiflash_branch_sha1}/centos7/tiflash-linux-arm64.tar.gz | tar xz
+                        curl ${FILE_SERVER_URL}/download/builds/pingcap/test/tics/${tiflash_branch_sha1}/centos7/tics-linux-arm64.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/build/pingcap/test/go-tpc/ae823e848af289e8a8b82b4bc975b1550a961079/go-tpc-linux-arm64 -o bin/go-tpc
+                        chmod +x ./bin/go-tpc
                         """
                     }
                 }
@@ -457,8 +470,8 @@ __EOF__
                             """
                     }
                     sh """
-                        ../bin/sync_diff_inspector -config ./sync_diff.toml
-                        """
+                    ../bin/sync_diff_inspector -config ./sync_diff.toml
+                    """
                 }
             }
 
@@ -469,16 +482,19 @@ __EOF__
 
 // Start main
 try {
-    stage("x86") {
-        stage("test") {
-            run_test("x86", "centos7")
-        }
-    }
-    stage("arm64") {
-        stage("arm64 test") {
-            run_test("arm64", "centos7")
-        }
-    }
+    parallel(
+            x86: {
+                stage("x86 test") {
+                    run_test("x86", "centos7")
+                }
+            },
+
+            arm64: {
+                stage("arm64 test") {
+                    run_test("arm64", "centos7")
+                }
+            }
+    )
 } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
     println "catch_exception FlowInterruptedException"
     println e
