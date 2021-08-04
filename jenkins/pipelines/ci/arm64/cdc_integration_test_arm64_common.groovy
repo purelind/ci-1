@@ -187,10 +187,10 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
 /**
  * Prepare the binary file for testing.
  */
-def prepare_binaries(arch, os) {
+def prepare_binaries(arch, os, is_need_go1160, sink_type_lable) {
     stage('Prepare Binaries') {
         def ticdc_bin_file = "${env.JOB_NAME}_${env.BUILD_NUMBER}-${os}-${arch}.tar.gz"
-        node("${GO_TEST_SLAVE}") {
+        run_with_pod(arch, os, is_need_go1160, sink_type_lable){
             container("golang") {
                 println "debug command:\nkubectl -n jenkins-ci exec -ti ${NODE_NAME} bash"
                 def ws = pwd()
