@@ -132,7 +132,7 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
                 }
             }
     }
-    if (sink_type_lable = "kafka") {
+    if (sink_type_lable == "kafka") {
         env.KAFKA_VERSION = "${KAFKA_VERSION}"
         podTemplate(label: label, 
                 cloud: cloud,
