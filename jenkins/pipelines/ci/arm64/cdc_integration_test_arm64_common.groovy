@@ -375,7 +375,7 @@ def download_binaries(arch, os) {
     def tiflash_url = "${FILE_SERVER_URL}/download/builds/pingcap/tiflash/${tiflash_branch_sha1}/centos7/tiflash.tar.gz"
     
     def minio_url = "${FILE_SERVER_URL}/download/minio.tar.gz"
-    def etcd_file = "etcd-v3.4.7-linux-amd64.tar.gz"
+    def etcd_file = "etcd-v3.4.7-linux-amd64"
     def etcd_url = "${FILE_SERVER_URL}/download/builds/pingcap/cdc/etcd-v3.4.7-linux-amd64.tar.gz"
     def sync_diff_inspector_url = "${FILE_SERVER_URL}/download/builds/pingcap/cdc/sync_diff_inspector.tar.gz"
     def jq_url = "https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64"
@@ -389,7 +389,7 @@ def download_binaries(arch, os) {
             tiflash_url = "${FILE_SERVER_URL}/download/builds/pingcap/test/tics/${tiflash_branch_sha1}/centos7/tics-linux-arm64.tar.gz"
             
             minio_url = "${FILE_SERVER_URL}/download/builds/pingcap/test/minio/minio-linux-arm64.tar.gz"
-            etcd_file = "etcd-v3.4.7-linux-arm64.tar.gz"
+            etcd_file = "etcd-v3.4.7-linux-arm64"
             etcd_url = "${FILE_SERVER_URL}/download/builds/pingcap/cdc/etcd-v3.4.7-linux-arm64.tar.gz"
             sync_diff_inspector_url = "${FILE_SERVER_URL}/download/builds/pingcap/cdc/sync_diff_inspector-linux-arm64.tar.gz"
             jq_url = "${FILE_SERVER_URL}/download/builds/pingcap/test/jq-1.6/jq-linux64"
