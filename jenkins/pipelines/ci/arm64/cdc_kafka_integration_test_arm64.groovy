@@ -138,16 +138,6 @@ def run_test(arch, os) {
         def script_path = "${ws}/cdc_integration_test_arm64_common.grovy"
         def common = load script_path
 
-        def KAFKA_TAG = "2.12-2.4.1"
-        def KAFKA_VERSION = "2.4.1"
-
-        println "KAFKA_VERSION=${KAFKA_VERSION}"
-        env.KAFKA_VERSION = "${KAFKA_VERSION}"
-        // HACK! Download jks by injecting RACK_COMMAND
-        // https://git.io/JJZXX -> https://github.com/pingcap/ticdc/raw/6e62afcfecc4e3965d8818784327d4bf2600d9fa/tests/_certificates/kafka.server.keystore.jks
-        // https://git.io/JJZXM -> https://github.com/pingcap/ticdc/raw/6e62afcfecc4e3965d8818784327d4bf2600d9fa/tests/_certificates/kafka.server.truststore.jks
-        download_jks = 'curl -sfL https://git.io/JJZXX -o /tmp/kafka.server.keystore.jks && curl -sfL https://git.io/JJZXM -o /tmp/kafka.server.truststore.jks'
-
 
         common.prepare_binaries(arch, os, is_need_go1160, "mysql")
         common.tests("kafka", arch, os)
