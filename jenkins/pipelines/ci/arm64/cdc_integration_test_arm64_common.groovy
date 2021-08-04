@@ -271,7 +271,7 @@ def tests(sink_type, arch, os) {
                     unstash 'ticdc'
 
                     dir("go/src/github.com/pingcap/ticdc") {
-                        download_binaries()
+                        download_binaries(arch, os)
 
                         try {
                             sh """
@@ -348,7 +348,7 @@ get_commit_hash = { prj, branch_or_hash ->
 /**
  * Download the integration test-related binaries.
  */
-def download_binaries() {
+def download_binaries(arch, os) {
 
     def tidb_sha1 = get_commit_hash("tidb", TIDB_BRANCH_OR_COMMIT)
     def tikv_sha1 = get_commit_hash("tikv", TIKV_BRANCH_OR_COMMIT)
