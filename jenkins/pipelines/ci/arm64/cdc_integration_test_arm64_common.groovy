@@ -354,11 +354,11 @@ def download_binaries(arch, os) {
     def tikv_sha1 = get_commit_hash("tikv", TIKV_BRANCH_OR_COMMIT)
     def pd_sha1 = get_commit_hash("pd", PD_BRANCH_OR_COMMIT)
     def tools_sha1 = get_commit_hash("tidb-tools", TOOLS_BRANCH_OR_COMMIT)
-    def tiflash_branch_sha1 = ""
+    def tiflash_branch_sha1 = TIFLASH_BRANCH_AND_COMMIT
 
     if (arch == "x86") {
         if (TIFLASH_BRANCH_AND_COMMIT == "master" || TIFLASH_BRANCH_AND_COMMIT == "release-5.1") {
-            tiflash_branch_sha1 = "master/" + get_commit_hash("tiflash", TIFLASH_BRANCH_AND_COMMIT)
+            tiflash_branch_sha1 = "${TIFLASH_BRANCH_AND_COMMIT}/" + get_commit_hash("tiflash", TIFLASH_BRANCH_AND_COMMIT)
         }
     }
     if (arch == "arm64") {
