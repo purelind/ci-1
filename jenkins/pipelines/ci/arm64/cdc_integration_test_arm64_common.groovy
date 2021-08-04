@@ -177,6 +177,7 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
                 ) {
                     node(label) {
                         println "debug command:\nkubectl -n ${K8S_NAMESPACE} exec -ti ${NODE_NAME} bash"
+                        sh "ls -l /tmp"
                         body()
                     }
                 }
