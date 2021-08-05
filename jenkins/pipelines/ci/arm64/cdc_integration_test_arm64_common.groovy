@@ -113,7 +113,7 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
                     namespace: 'jenkins-tidb',
                     containers: [
                             containerTemplate(
-                                    name: 'golang', alwaysPullImage: false,
+                                    name: 'golang', alwaysPullImage: true,
                                     image: pod_go_docker_image, ttyEnabled: true,
                                     resourceRequestCpu: '2000m', resourceRequestMemory: '4Gi',
                                     resourceLimitCpu: '30000m', resourceLimitMemory: "30Gi",
@@ -149,10 +149,10 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
                                 name: 'jnlp', image: jnlp_docker_image, alwaysPullImage: false,
                                 resourceRequestCpu: '100m', resourceRequestMemory: '256Mi',
                         ),
-                        containerTemplate(name: 'golang',alwaysPullImage: false, image: pod_go_docker_image,
+                        containerTemplate(name: 'golang',alwaysPullImage: true, image: pod_go_docker_image,
                                 resourceRequestCpu: '2000m', resourceRequestMemory: '4Gi',
                                 ttyEnabled: true, command: 'cat'),
-                        containerTemplate(name: 'zookeeper',alwaysPullImage: false, image: pod_zookeeper_docker_image,
+                        containerTemplate(name: 'zookeeper',alwaysPullImage: true, image: pod_zookeeper_docker_image,
                                 resourceRequestCpu: '2000m', resourceRequestMemory: '4Gi',
                                 ttyEnabled: true),
                         containerTemplate(
@@ -160,7 +160,7 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
                                 image: pod_kafka_docker_image,
                                 resourceRequestCpu: '2000m', resourceRequestMemory: '4Gi',
                                 ttyEnabled: true,
-                                alwaysPullImage: false,
+                                alwaysPullImage: true,
                                 envVars: [
                                         envVar(key: 'KAFKA_MESSAGE_MAX_BYTES', value: '1073741824'),
                                         envVar(key: 'KAFKA_REPLICA_FETCH_MAX_BYTES', value: '1073741824'),
