@@ -109,7 +109,7 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
     if (sink_type_lable == "mysql") {
         podTemplate(label: label,
                     cloud: cloud,
-                    idleMinutes: 0,
+                    idleMinutes: 60,
                     namespace: 'jenkins-tidb',
                     containers: [
                             containerTemplate(
