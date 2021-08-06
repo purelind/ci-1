@@ -346,6 +346,12 @@ def tests(sink_type, arch, os) {
     }
 }
 
+def debug_tests(sink_type, arch, os) {
+    stage("Tests") {
+        echo "hello world"
+    }
+}
+
 
 get_commit_hash = { prj, branch_or_hash ->
     if (branch_or_hash.length() == 40) {
