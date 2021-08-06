@@ -111,7 +111,7 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
                     cloud: cloud,
                     idleMinutes: 60,
                     namespace: 'jenkins-tidb',
-                    nodeSelector: "kubernetes.io/hostname=k8s-arm-node-2"
+                    nodeSelector: "kubernetes.io/hostname=k8s-arm-node-2",
                     containers: [
                             containerTemplate(
                                     name: 'golang', alwaysPullImage: true,
