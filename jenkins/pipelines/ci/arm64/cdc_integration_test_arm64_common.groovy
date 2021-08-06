@@ -349,6 +349,47 @@ def tests(sink_type, arch, os) {
 def debug_tests(sink_type, arch, os) {
     stage("Tests") {
         echo "hello world"
+        def run_integration_test = { step_name, case_names ->
+            run_with_pod(arch, os, is_need_go1160, sink_type){
+                container("golang") {
+                    def ws = pwd()
+                    deleteDir()
+                    println "this step will run tests: ${case_names}"
+                    unstash 'ticdc'
+
+                    dir("go/src/github.com/pingcap/ticdc") {
+                        download_binaries(arch, os)
+
+                        try {
+                            sh """
+                                sudo pip install s3cmd
+
+                                rm -rf /tmp/tidb_cdc_test
+                                mkdir -p /tmp/tidb_cdc_test
+                                echo "${env.KAFKA_VERSION}" > /tmp/tidb_cdc_test/KAFKA_VERSION
+                                
+                                GOPATH=\$GOPATH:${ws}/go PATH=\$GOPATH/bin:${ws}/go/bin:\$PATH make integration_test_${sink_type} CASE="${case_names}"
+
+                            """
+                            // cyclic tests do not run on kafka sink, so there is no cov* file.
+                            sh """
+                                tail /tmp/tidb_cdc_test/cov* || true
+                            """
+                        } catch (Exception e) {
+                            sh """
+                                echo "archive all log"
+                                for log in `ls /tmp/tidb_cdc_test/*/*.log`; do
+                                    cat \$log
+                                done
+                            """
+                            throw e;
+                        }
+                    }
+                }
+            }
+        }
+
+        run_integration_test("test1", "autorandom")
     }
 }
 
