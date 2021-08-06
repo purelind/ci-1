@@ -115,8 +115,7 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
                             containerTemplate(
                                     name: 'golang', alwaysPullImage: true,
                                     image: pod_go_docker_image, ttyEnabled: true,
-                                    resourceRequestCpu: '2000m', resourceRequestMemory: '4Gi',
-                                    resourceLimitCpu: '30000m', resourceLimitMemory: "30Gi",
+                                    resourceRequestCpu: '20000m', resourceRequestMemory: '16Gi',
                                     command: '/bin/sh -c', args: 'cat',
                             ),
                             containerTemplate(
