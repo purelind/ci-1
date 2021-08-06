@@ -81,7 +81,7 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
         }
         if (arch == "arm64") {
             label = "ticdc-${sink_type_lable}-integration-test-arm64"
-            pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.16-arm64:latest"
+            pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.16-arm64:tini"
             jnlp_docker_image = "hub.pingcap.net/jenkins/jnlp-slave-arm64:latest"
             cloud = "kubernetes-arm64"
             pod_zookeeper_docker_image = "zookeeper:3.4.13"
@@ -111,12 +111,13 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
                     cloud: cloud,
                     idleMinutes: 60,
                     namespace: 'jenkins-tidb',
+                    nodeSelector: "kubernetes.io/hostname=k8s-arm-node-2"
                     containers: [
                             containerTemplate(
                                     name: 'golang', alwaysPullImage: true,
                                     image: pod_go_docker_image, ttyEnabled: true,
                                     resourceRequestCpu: '20000m', resourceRequestMemory: '16Gi',
-                                    command: '/bin/sh -c', args: 'cat',
+                                    args: 'cat',
                             ),
                             containerTemplate(
                                     name: 'jnlp', image: jnlp_docker_image, alwaysPullImage: false,
