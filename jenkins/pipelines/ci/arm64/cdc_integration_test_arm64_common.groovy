@@ -236,37 +236,37 @@ def prepare_binaries(arch, os, is_need_go1160, sink_type_lable) {
  */
 def tests(sink_type, arch, os) {
     stage("Tests") {
-        def test_cases = [:]
-        // Set to fail fast.
-        test_cases.failFast = true
+        // def test_cases = [:]
+        // // Set to fail fast.
+        // test_cases.failFast = true
 
-        // Start running unit tests.
-        test_cases["unit test"] = {
-            run_with_pod(arch, os, is_need_go1160, sink_type){
-                container("golang") {
-                    def ws = pwd()
-                    deleteDir()
-                    unstash 'ticdc'
+        // // Start running unit tests.
+        // test_cases["unit test"] = {
+        //     run_with_pod(arch, os, is_need_go1160, sink_type){
+        //         container("golang") {
+        //             def ws = pwd()
+        //             deleteDir()
+        //             unstash 'ticdc'
 
-                    dir("go/src/github.com/pingcap/ticdc") {
-                        sh """
-                            rm -rf /tmp/tidb_cdc_test
-                            mkdir -p /tmp/tidb_cdc_test
-                            GOPATH=\$GOPATH:${ws}/go PATH=\$GOPATH/bin:${ws}/go/bin:\$PATH make test
-                            rm -rf cov_dir
-                            mkdir -p cov_dir
-                            ls /tmp/tidb_cdc_test
-                            cp /tmp/tidb_cdc_test/cov*out cov_dir
-                        """
-                        sh """
-                            tail /tmp/tidb_cdc_test/cov*
-                        """
-                    }
+        //             dir("go/src/github.com/pingcap/ticdc") {
+        //                 sh """
+        //                     rm -rf /tmp/tidb_cdc_test
+        //                     mkdir -p /tmp/tidb_cdc_test
+        //                     GOPATH=\$GOPATH:${ws}/go PATH=\$GOPATH/bin:${ws}/go/bin:\$PATH make test
+        //                     rm -rf cov_dir
+        //                     mkdir -p cov_dir
+        //                     ls /tmp/tidb_cdc_test
+        //                     cp /tmp/tidb_cdc_test/cov*out cov_dir
+        //                 """
+        //                 sh """
+        //                     tail /tmp/tidb_cdc_test/cov*
+        //                 """
+        //             }
 
-                    stash includes: "go/src/github.com/pingcap/ticdc/cov_dir/**", name: "unit_test-${os}-${arch}", useDefaultExcludes: false
-                }
-            }
-        }
+        //             stash includes: "go/src/github.com/pingcap/ticdc/cov_dir/**", name: "unit_test-${os}-${arch}", useDefaultExcludes: false
+        //         }
+        //     }
+        // }
 
         // Start running integration tests.
         def run_integration_test = { step_name, case_names ->
@@ -286,7 +286,7 @@ def tests(sink_type, arch, os) {
                                 rm -rf /tmp/tidb_cdc_test
                                 mkdir -p /tmp/tidb_cdc_test
                                 echo "${env.KAFKA_VERSION}" > /tmp/tidb_cdc_test/KAFKA_VERSION
-                                
+
                                 GOPATH=\$GOPATH:${ws}/go PATH=\$GOPATH/bin:${ws}/go/bin:\$PATH make integration_test_${sink_type} CASE="${case_names}"
                                 rm -rf cov_dir
                                 mkdir -p cov_dir
@@ -332,19 +332,19 @@ def tests(sink_type, arch, os) {
         cases_namesList.each { case_names ->
             step_cases.add(case_names)
         }
-        step_cases.eachWithIndex { case_names, index ->
-            def step_name = "step_${index}"
-            test_cases["integration test ${step_name}"] = {
-                run_integration_test(step_name, case_names.join(" "))
-            }
-        }
-
         // step_cases.eachWithIndex { case_names, index ->
         //     def step_name = "step_${index}"
-        //     run_integration_test(step_name, case_names.join(" "))
+        //     test_cases["integration test ${step_name}"] = {
+        //         run_integration_test(step_name, case_names.join(" "))
+        //     }
         // }
 
-        parallel test_cases
+        step_cases.eachWithIndex { case_names, index ->
+            def step_name = "step_${index}"
+            run_integration_test(step_name, case_names.join(" "))
+        }
+
+        // parallel test_cases
     }
 }
 

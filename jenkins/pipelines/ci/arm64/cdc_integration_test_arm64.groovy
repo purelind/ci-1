@@ -79,8 +79,8 @@ def run_test(arch, os) {
         def common = load script_path
 
         common.prepare_binaries(arch, os, is_need_go1160, "mysql")
-        // common.tests("mysql", arch, os)
-        common.debug_tests("mysql", arch, os)
+        common.tests("mysql", arch, os)
+        // common.debug_tests("mysql", arch, os)
     }
 
 }
