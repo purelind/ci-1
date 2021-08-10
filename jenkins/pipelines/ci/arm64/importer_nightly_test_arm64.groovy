@@ -27,6 +27,10 @@ def run_with_pod(arch, os, Closure body) {
         jnlp_docker_image = "hub.pingcap.net/jenkins/jnlp-slave-arm64:latest"
         cloud = "kubernetes-arm64"
     }
+    if (os == "kylin") {
+        label = "importer-nightly-test-arm64-kylin"
+        cloud = "kubernetes-kylin-arm64"
+    }
     podTemplate(label: label,
             cloud: cloud,
             namespace: 'jenkins-tidb',
@@ -120,9 +124,14 @@ try {
                     run_test("x86", "centos7")
                 }
             },
-            arm64: {
-                stage("arm64 test") {
+            arm64_Centos7: {
+                stage("arm64-centos7 test") {
                     run_test("arm64", "centos7")
+                }
+            },
+            arm64_Kylin: {
+                stage("arm64-kylin test") {
+                    run_test("arm64", "kylin")
                 }
             }
     )

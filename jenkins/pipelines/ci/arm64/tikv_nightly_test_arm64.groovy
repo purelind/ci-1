@@ -25,6 +25,10 @@ def run_with_pod(arch, os, Closure body) {
         jnlp_docker_image = "hub.pingcap.net/jenkins/jnlp-slave-arm64:latest"
         cloud = "kubernetes-arm64"
     }
+    if (os == "kylin") {
+        label = "tikv-nightly-test-arm64-kylin"
+        cloud = "kubernetes-kylin-arm64"
+    }
     podTemplate(label: label,
             cloud: cloud,
             namespace: 'jenkins-tidb',
@@ -98,7 +102,7 @@ def run_test(arch, os) {
                 container("rust") {
                     sh """
                     grpcio_ver=`grep -A 1 'name = "grpcio"' Cargo.lock | tail -n 1 | cut -d '"' -f 2`
-                    if [[ ! "0.8.0" > "\\$grpcio_ver" ]]; then
+                    if [[ ! "0.8.0" > "\$grpcio_ver" ]]; then
                         echo using gcc 8
                         source /opt/rh/devtoolset-8/enable
                     fi
@@ -120,9 +124,14 @@ try {
                     run_test("x86", "centos7")
                 }
             },
-            arm64: {
-                stage("arm64 test") {
+            arm64_Centos7: {
+                stage("arm64-centos7 test") {
                     run_test("arm64", "centos7")
+                }
+            },
+            arm64_Kylin: {
+                stage("arm64-kylin test") {
+                    run_test("arm64", "kylin")
                 }
             }
     )
