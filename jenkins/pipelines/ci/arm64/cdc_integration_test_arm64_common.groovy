@@ -280,6 +280,15 @@ def tests(sink_type, arch, os) {
                         download_binaries(arch, os)
 
                         try {
+                            // jq binary download from  ${FILE_SERVER_URL}/download/builds/pingcap/test/jq-1.6/jq-linux64
+                            //  is not executorable. use jq cmd in docker image hub.pingcap.net/jenkins/centos7_golang-1.16-arm64:tini
+                            if (arch == "arm64") {
+                                sh """
+                                cd ./bin
+                                rm -rf jq
+                                ln -s /usr/bin/jq jq
+                                """
+                            }
                             sh """
                                 sudo pip install s3cmd
                                 rm -rf /tmp/tidb_cdc_test
