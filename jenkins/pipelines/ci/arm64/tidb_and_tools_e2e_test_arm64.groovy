@@ -36,7 +36,7 @@ properties([
                         trim: true
                 ),
                 string(
-                        defaultValue: 'master',
+                        defaultValue: 'master/09e23b10f4687c8487d426815d18d436ec7d4f07',
                         name: 'TIFLASH_BRANCH_AND_COMMIT',
                         trim: true
                 ),
@@ -136,11 +136,11 @@ def run_test(arch, os) {
                     def tikv_sha1 = get_commit_hash("tikv", TIKV_BRANCH_OR_COMMIT)
                     def pd_sha1 = get_commit_hash("pd", PD_BRANCH_OR_COMMIT)
                     def binlog_sha1 = get_commit_hash("tidb-binlog", BINLOG_BRANCH_OR_COMMIT)
-                    def br_sha1 = ""
+                    def br_sha1 = BR_BRANCH_AND_COMMIT
 
                     def cdc_sha1 = get_commit_hash("ticdc", TICDC_BRANCH_OR_COMMIT)
                     def tools_sha1 = get_commit_hash("tidb-tools", TOOLS_BRANCH_OR_COMMIT)
-                    def tiflash_branch_sha1 = ""
+                    def tiflash_branch_sha1 = TIFLASH_BRANCH_AND_COMMIT
 
                     if (arch == "x86") {
                         if (BR_BRANCH_AND_COMMIT == "master" || BR_BRANCH_AND_COMMIT == "release-5.1" ) {
@@ -184,7 +184,7 @@ def run_test(arch, os) {
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/test/tidb-tools/${tools_sha1}/centos7/tidb-tools-linux-arm64.tar.gz | tar xz bin
                         curl ${FILE_SERVER_URL}/download/builds/pingcap/test/tics/${tiflash_branch_sha1}/centos7/tics-linux-arm64.tar.gz | tar xz
                         curl ${FILE_SERVER_URL}/download/build/pingcap/test/go-tpc/ae823e848af289e8a8b82b4bc975b1550a961079/go-tpc-linux-arm64 -o bin/go-tpc
-                        chmod +x ./bin/go-tpc
+                        chmod a+x ./bin/go-tpc
                         """
                     }
                 }

@@ -30,6 +30,8 @@ if (params.containsKey("release_test") && params.triggered_by_upstream_ci == nul
     TIDB_BRANCH = params.release_test_tidb_commit
 }
 
+specStr = "+refs/heads/*:refs/remotes/origin/*"
+
 K8S_NAMESPACE = "jenkins-tidb"
 BRANCH_NEED_GO1160 = ["master", "release-5.1"]
 
@@ -57,13 +59,13 @@ def run_with_pod(arch, os, Closure body) {
     def pod_mysql_docker_image = ""
     def jnlp_docker_image = ""
     if (arch == "x86") {
-        label = "tidb-integration-common"
+        label = "tools-integration-test"
         pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.13:latest"
         pod_mysql_docker_image = "registry-mirror.pingcap.net/library/mysql:5.6"
         jnlp_docker_image = "jenkins/inbound-agent:4.3-4"
     }
     if (arch == "arm64") {
-        label = "tidb-integration-common-arm64"
+        label = "tools-integration-test-arm64"
         pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.13-arm64:latest"
         pod_mysql_docker_image = "hub.pingcap.net/jenkins/mysql-arm64:5.7"
         jnlp_docker_image = "hub.pingcap.net/jenkins/jnlp-slave-arm64:latest"
