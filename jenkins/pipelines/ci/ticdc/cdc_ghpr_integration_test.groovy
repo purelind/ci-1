@@ -9,8 +9,6 @@ if (params.containsKey("release_test")) {
     ghprbPullDescription = "release-test"
 }
 
-def ciRepeUrl = "https://github.com/PingCAP-QE/ci.git"
-def ciRepoBranch = "main"
 
 def specStr = "+refs/pull/${ghprbPullId}/*:refs/remotes/origin/pr/${ghprbPullId}/*"
 if (ghprbPullId == null || ghprbPullId == "") {
@@ -59,9 +57,10 @@ if (!isNeedGo1160 && ghprbTargetBranch.startsWith("release-")) {
 if (isNeedGo1160) {
     println "This build use go1.16"
     GO_BUILD_SLAVE = GO1160_BUILD_SLAVE
-    GO_TEST_SLAVE = GO1160_TEST_SLAVE
+    GO_TEST_SLAVE = "debug-ticdc-go1160"
 } else {
-    println "This build use go1.13"
+    GO_BUILD_SLAVE = GO1160_BUILD_SLAVE
+    GO_TEST_SLAVE = "debug-ticdc-go1130"
 }
 println "BUILD_NODE_NAME=${GO_BUILD_SLAVE}"
 println "TEST_NODE_NAME=${GO_TEST_SLAVE}"
@@ -94,31 +93,15 @@ catchError {
                     sh "git checkout -f ${ghprbActualCommit}"
                 }
 
-                dir("${ws}/go/src/github.com/pingcap/ci") {
-                    if (sh(returnStatus: true, script: '[ -d .git ] && git rev-parse --git-dir > /dev/null 2>&1') != 0) {
-                        echo "Not a valid git folder: ${ws}/go/src/github.com/pingcap/ci"
-                        deleteDir()
-                    }
-                    try {
-                        checkout changelog: false, poll: false, scm: [$class: 'GitSCM', branches: [[name: "${ciRepoBranch}"]], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'PruneStaleBranch'], [$class: 'CleanBeforeCheckout']], submoduleCfg: [], userRemoteConfigs: [[refspec: specStr, url: "${ciRepeUrl}"]]]
-                    } catch (info) {
-                        retry(2) {
-                            echo "checkout failed, retry.."
-                            sleep 5
-                            if (sh(returnStatus: true, script: '[ -d .git ] && git rev-parse --git-dir > /dev/null 2>&1') != 0) {
-                                echo "Not a valid git folder: ${ws}/go/src/github.com/pingcap/ci"
-                                deleteDir()
-                            }
-                            checkout changelog: false, poll: false, scm: [$class: 'GitSCM', branches: [[name: "${ciRepoBranch}"]], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'PruneStaleBranch'], [$class: 'CleanBeforeCheckout']], submoduleCfg: [], userRemoteConfigs: [[refspec: specStr, url: "${ciRepeUrl}"]]]
-                        }
-                    }
-
-                }
 
                 stash includes: "go/src/github.com/pingcap/ticdc/**", name: "ticdc", useDefaultExcludes: false
             }
 
-            def script_path = "go/src/github.com/pingcap/ci/jenkins/pipelines/ci/ticdc/integration_test_common.groovy"
+            def common_groovy_file_url = "https://raw.githubusercontent.com/purelind/ci-1/purelind/fix-cdc-it-test-error/jenkins/pipelines/ci/ticdc/integration_test_common.groovys"
+            sh "curl -L ${common_groovy_file_url} -o cdc_integration_test_common.grovy"
+            def ws = pwd()
+
+            def script_path = "${ws}/cdc_integration_test_common.grovy"
             def common = load script_path
             catchError {
                 common.prepare_binaries()

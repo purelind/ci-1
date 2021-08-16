@@ -78,7 +78,7 @@ def tests(sink_type, node_label) {
     stage("Tests") {
         def test_cases = [:]
         // Set to fail fast.
-        test_cases.failFast = false
+        // test_cases.failFast = false
 
         // Start running unit tests.
         test_cases["unit test"] = {
