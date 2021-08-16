@@ -134,8 +134,6 @@ try {
             }
         }
     )
-
-
 } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
     println "catch_exception FlowInterruptedException"
     println e

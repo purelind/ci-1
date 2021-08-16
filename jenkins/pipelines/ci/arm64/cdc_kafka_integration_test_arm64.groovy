@@ -68,67 +68,6 @@ def boolean isBranchMatched(List<String> branches, String targetBranch) {
 
 is_need_go1160 = isBranchMatched(BRANCH_NEED_GO1160, RELEASE_BRANCH)
 
-// def run_with_pod(arch, os, Closure body) {
-//     def label = ""
-//     def cloud = "kubernetes"
-//     def pod_go_docker_image = ""
-//     def jnlp_docker_image = ""
-//     if (is_need_go1160) {
-//         if (arch == "x86") {
-//             label = "tidb-integration-common"
-//             pod_go_docker_image = "hub.pingcap.net/pingcap/centos7_golang-1.16:latest"
-//             jnlp_docker_image = "jenkins/inbound-agent:4.3-4"
-//         }
-//         if (arch == "arm64") {
-//             label = "tidb-integration-common-arm64"
-//             pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.16-arm64:latest"
-//             jnlp_docker_image = "hub.pingcap.net/jenkins/jnlp-slave-arm64:latest"
-//             cloud = "kubernetes-arm64"
-//         }
-//     } else {
-//         if (arch == "x86") {
-//             label = "tidb-integration-common"
-//             pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.13:latest"
-//             jnlp_docker_image = "jenkins/inbound-agent:4.3-4"
-//         }
-//         if (arch == "arm64") {
-//             label = "tidb-integration-common-arm64"
-//             pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.13-arm64:latest"
-//             jnlp_docker_image = "hub.pingcap.net/jenkins/jnlp-slave-arm64:latest"
-//             cloud = "kubernetes-arm64"
-//         }
-//     }
-//     podTemplate(label: label,
-//             cloud: cloud,
-//             namespace: 'jenkins-tidb',
-//             containers: [
-//                     containerTemplate(
-//                             name: 'golang', alwaysPullImage: false,
-//                             image: "${pod_go_docker_image}", ttyEnabled: true,
-//                             resourceRequestCpu: '2000m', resourceRequestMemory: '4Gi',
-//                             resourceLimitCpu: '30000m', resourceLimitMemory: "20Gi",
-//                             command: '/bin/sh -c', args: 'cat',
-//                     ),
-//                     containerTemplate(
-//                             name: 'jnlp', image: "${jnlp_docker_image}", alwaysPullImage: false,
-//                             resourceRequestCpu: '100m', resourceRequestMemory: '256Mi',
-//                     ),
-//             ],
-
-//     ) {
-//         node(label) {
-//             println "debug command:\nkubectl -n ${K8S_NAMESPACE} exec -ti ${NODE_NAME} bash"
-//             body()
-//         }
-//     }
-
-// }
-
-// def run_build(arch, os) {
-//     run_with_pod(arch, os) {
-//     }
-// }
-
 def run_test(arch, os) {
     node("${GO_TEST_SLAVE}") {
         def common_groovy_file_url = "https://raw.githubusercontent.com/purelind/ci-1/purelind/tidb-arm64-daily-build/jenkins/pipelines/ci/arm64/cdc_integration_test_arm64_common.groovy"
@@ -181,19 +120,19 @@ try {
         }
     }
 
-    stage("x86") {
-        stage("test") {
-            run_test("x86", "centos7")
+    parallel(
+        "x86": {
+            stage("x86 test") {
+                run_test("x86", "centos7")
+            }
+        },
+
+        "arm64": {
+            stage("arm64 test") {
+                run_test("arm64", "centos7")
+            }
         }
-    }
-    // stage("arm64") {
-    //     stage("arm64 build") {
-    //         run_build("arm64", "centos7")
-    //     }
-    //     stage("arm64 test") {
-    //         run_test("arm64", "centos7")
-    //     }
-    // }
+    )
 } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
     println "catch_exception FlowInterruptedException"
     println e
