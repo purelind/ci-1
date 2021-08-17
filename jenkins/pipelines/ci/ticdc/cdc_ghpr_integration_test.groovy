@@ -66,8 +66,6 @@ println "BUILD_NODE_NAME=${GO_BUILD_SLAVE}"
 println "TEST_NODE_NAME=${GO_TEST_SLAVE}"
 
 catchError {
-    withEnv(['CODECOV_TOKEN=c6ac8b7a-7113-4b3f-8e98-9314a486e41e',
-             'COVERALLS_TOKEN=HTRawMvXi9p5n4OyBvQygxd5iWjNUKd1o']) {
         node("${GO_TEST_SLAVE}") {
             stage('Prepare') {
                 def ws = pwd()
@@ -93,20 +91,18 @@ catchError {
                     sh "git checkout -f ${ghprbActualCommit}"
                 }
 
-
                 stash includes: "go/src/github.com/pingcap/ticdc/**", name: "ticdc", useDefaultExcludes: false
             }
 
-            def common_groovy_file_url = "https://raw.githubusercontent.com/purelind/ci-1/purelind/fix-cdc-it-test-error/jenkins/pipelines/ci/ticdc/integration_test_common.groovys"
-            sh "curl -L ${common_groovy_file_url} -o cdc_integration_test_common.grovy"
+            def common_groovy_file_url = "https://raw.githubusercontent.com/purelind/ci-1/purelind/fix-cdc-it-test-error/jenkins/pipelines/ci/ticdc/integration_test_common.groovy"
+            sh "curl -L ${common_groovy_file_url} -o cdc_integration_test_common.groovy"
             def ws = pwd()
 
-            def script_path = "${ws}/cdc_integration_test_common.grovy"
+            def script_path = "${ws}/cdc_integration_test_common.groovy"
             def common = load script_path
             catchError {
                 common.prepare_binaries()
                 common.tests("mysql", "${GO_TEST_SLAVE}")
-                common.coverage()
                 currentBuild.result = "SUCCESS"
             }
 
@@ -124,7 +120,6 @@ catchError {
                 }
             }
         }
-    }
 }
 
 
