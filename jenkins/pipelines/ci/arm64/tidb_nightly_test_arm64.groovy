@@ -31,20 +31,20 @@ is_need_go1160 = isBranchMatched(BRANCH_NEED_GO1160, branch)
 
 def do_checkout(branch, refspec) {
     checkout(
-        changelog: false, 
+        changelog: false,
         poll: false,
         scm: [$class: 'GitSCM',
                 branches: [[name: "${branch}"]],
                 doGenerateSubmoduleConfigurations: false,
-                extensions: [[$class: 'PruneStaleBranch'], 
-                    [$class: 'CleanBeforeCheckout'], 
+                extensions: [[$class: 'PruneStaleBranch'],
+                    [$class: 'CleanBeforeCheckout'],
                     [$class: 'CloneOption', timeout: 2]],
                 submoduleCfg: [],
-                userRemoteConfigs: [[credentialsId: 'github-sre-bot-ssh', 
-                    refspec: refspec, 
+                userRemoteConfigs: [[credentialsId: 'github-sre-bot-ssh',
+                    refspec: refspec,
                     url: 'git@github.com:pingcap/tidb.git']]]
 
-    ) 
+    )
 }
 
 def checkout_tidb(branch) {
@@ -214,7 +214,7 @@ def run_test(arch, os) {
                             }
                         }
                     }
-                    
+
                     stage("Build plugin") {
                         println "Start build tidb plugin"
                         dir("go/src/github.com/pingcap/tidb-build-plugin") {
@@ -255,7 +255,7 @@ def run_test(arch, os) {
                                 ${ws}/go/src/github.com/pingcap/tidb/bin/tidb-server -plugin-dir=${ws}/go/src/github.com/pingcap/tidb/plugin-so -plugin-load=audit-1,whitelist-1 > /tmp/loading-plugin.log 2>&1 &
             
                                 sleep 5
-                                mysql -h 127.0.0.1 -P 4000 -u root -e "select tidb_version()"
+                                for i in 1 2 3; do mysql -h 127.0.0.1 -P 4000 -u root -e "select tidb_version()"  && break || sleep 5; done
                                 """
                             } catch (error) {
                                 sh """
@@ -270,7 +270,7 @@ def run_test(arch, os) {
                                 """
                             }
                         }
-                        
+
                     }
                 }
             }
@@ -279,36 +279,9 @@ def run_test(arch, os) {
                 stage("Build & Test") {
                     container("golang") {
                         dir("go/src/github.com/pingcap/tidb") {
-                            try {
-                                if (branch == "master") {
-                                    sh "make check"
-                                    try {
-                                        sh "make test_part_1"
-                                    } catch (err) {
-                                        throw err
-                                    } finally {
-                                        sh "cat cmd/explaintest/explain-test.out || true"
-                                    }
-                                } else {
-                                    sh "make dev"
-                                }
-                            } catch (err) {
-                                throw err
-                            } finally {
-                                sh "cat cmd/explaintest/explain-test.out || true"
-                            }
-                        }
-                    }
-                }
-
-                stage("Check go mod replace is removed") {
-                    container("golang") {
-                        dir("go/src/github.com/pingcap/tidb") {
-                            timeout(10) {
-                                sh """
-                                if [ \"${branch}\" == \"master\" ] ;then ./tools/check/check_parser_replace.sh ;fi
-                                """
-                            }
+                            // sh "make check"
+                            sh "make test_part_1"
+                            sh "EXTRA_TEST_ARGS='-timeout 9m'  make test_part_2"
                         }
                     }
                 }
