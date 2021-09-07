@@ -339,7 +339,7 @@ def tests(sink_type, arch, os) {
                 returnStdout: true
         ).trim().split()
 
-        run_integration_test("cdc_integration_test", case_names.join(" "))
+        run_integration_test("cdc_integration_test", cases_name)
 
 
         // Run integration tests in groups.
