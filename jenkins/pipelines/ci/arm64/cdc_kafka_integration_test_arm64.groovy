@@ -131,7 +131,13 @@ try {
             stage("arm64 test") {
                 run_test("arm64", "centos7")
             }
-        }
+        },
+
+        "arm64-kylin": {
+            stage("arm64 kylin test") {
+                run_test(arch: "arm64", os: "kylin")
+            }
+        },
     )
 } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
     println "catch_exception FlowInterruptedException"

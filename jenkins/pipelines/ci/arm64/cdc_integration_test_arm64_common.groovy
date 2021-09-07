@@ -106,6 +106,12 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
             pod_kafka_docker_image = "hub.pingcap.net/jenkins/kafka-arm64:latest"
         }
     }
+
+    if (os == "kylin") {
+        label = "ticdc-${sink_type_lable}-integration-test-arm64-kylin"
+        cloud = "kubernetes-kylin-arm64"
+    }
+
     if (sink_type_lable == "mysql") {
         podTemplate(label: label,
                     cloud: cloud,
