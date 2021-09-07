@@ -339,13 +339,16 @@ def tests(sink_type, arch, os) {
                 returnStdout: true
         ).trim().split()
 
+        run_integration_test("cdc_integration_test", case_names.join(" "))
+
+
         // Run integration tests in groups.
-        def step_cases = []
-        def cases_namesList = partition(cases_name, GROUP_SIZE)
-        TOTAL_COUNT = cases_namesList.size()
-        cases_namesList.each { case_names ->
-            step_cases.add(case_names)
-        }
+//        def step_cases = []
+//        def cases_namesList = partition(cases_name, GROUP_SIZE)
+//        TOTAL_COUNT = cases_namesList.size()
+//        cases_namesList.each { case_names ->
+//            step_cases.add(case_names)
+//        }
         // step_cases.eachWithIndex { case_names, index ->
         //     def step_name = "step_${index}"
         //     test_cases["integration test ${step_name}"] = {
@@ -353,10 +356,10 @@ def tests(sink_type, arch, os) {
         //     }
         // }
 
-        step_cases.eachWithIndex { case_names, index ->
-            def step_name = "step_${index}"
-            run_integration_test(step_name, case_names.join(" "))
-        }
+//        step_cases.eachWithIndex { case_names, index ->
+//            def step_name = "step_${index}"
+//            run_integration_test(step_name, case_names.join(" "))
+//        }
 
         // parallel test_cases
     }
