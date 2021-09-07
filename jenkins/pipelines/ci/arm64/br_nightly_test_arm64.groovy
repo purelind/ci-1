@@ -31,7 +31,7 @@ def run_with_pod(arch, os, Closure body) {
     if (is_need_go1160) {
         if (arch == "x86") {
             label = "br_nightly_test"
-            pod_go_docker_image = "hub.pingcap.net/pingcap/centos7_golang-1.16:latest"
+            pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.16:latest"
             jnlp_docker_image = "jenkins/inbound-agent:4.3-4"
         }
         if (arch == "arm64") {

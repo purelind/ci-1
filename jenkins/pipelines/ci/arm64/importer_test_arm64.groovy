@@ -35,7 +35,7 @@ def run_with_pod(arch, os, Closure body) {
     def jnlp_docker_image = ""
     if (arch == "x86") {
         label = "importer-test"
-        pod_go_docker_image = "hub.pingcap.net/pingcap/centos7_golang-1.16:latest"
+        pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.16:latest"
         pod_rust_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.13_rust:latest"
         jnlp_docker_image = "jenkins/inbound-agent:4.3-4"
     }

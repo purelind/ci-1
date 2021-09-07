@@ -73,8 +73,8 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
         println "current test use go1.16.4"
         if (arch == "x86") {
             label = "ticdc-${sink_type_lable}-integration-test"
-            cloud = "kubernetes-backup"
-            pod_go_docker_image = "hub.pingcap.net/pingcap/centos7_golang-1.16:latest"
+            cloud = "kubernetes"
+            pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.16:latest"
             jnlp_docker_image = "jenkins/inbound-agent:4.3-4"
             pod_zookeeper_docker_image = "wurstmeister/zookeeper:latest"
             pod_kafka_docker_image = "wurstmeister/kafka:latest"
@@ -91,7 +91,7 @@ def run_with_pod(arch, os, is_need_go1160, sink_type_lable, Closure body) {
         println "current test use go1.13.7"
         if (arch == "x86") {
             label = "ticdc-${sink_type_lable}-integration-test"
-            cloud = "kubernetes-backup"
+            cloud = "kubernetes"
             pod_go_docker_image = "hub.pingcap.net/jenkins/centos7_golang-1.13:latest"
             jnlp_docker_image = "jenkins/inbound-agent:4.3-4"
             pod_zookeeper_docker_image = "wurstmeister/zookeeper:latest"
