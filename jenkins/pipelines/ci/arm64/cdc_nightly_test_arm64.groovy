@@ -67,8 +67,6 @@ def run_with_pod(arch, os, Closure body) {
                             resourceRequestCpu: '2000m', resourceRequestMemory: '4Gi',
                             resourceLimitCpu: '30000m', resourceLimitMemory: "20Gi",
                             command: '/bin/sh -c', args: 'cat',
-                            envVars: [containerEnvVar(key: 'GOMODCACHE', value: '/nfs/cache/mod'),
-                                      containerEnvVar(key: 'GOPATH', value: '/go')],
                     ),
                     containerTemplate(
                             name: 'jnlp', image: "${jnlp_docker_image}", alwaysPullImage: false,
