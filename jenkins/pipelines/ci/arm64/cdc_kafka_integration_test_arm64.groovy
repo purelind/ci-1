@@ -16,7 +16,7 @@ properties([
                         trim: true
                 ),
                 string(
-                        defaultValue: 'master',
+                        defaultValue: 'b32ee4afcb2932b0b4bec6ebeef24bd0547dbf5a',
                         name: 'TIKV_BRANCH_OR_COMMIT',
                         trim: true
                 ),
