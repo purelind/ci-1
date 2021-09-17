@@ -249,10 +249,12 @@ try {
                 }
             },
             test_arm64_centos7: {
-
-            },
-            test_arm64_kylin_v10: {
-
+                stage("arm64 build") {
+                    run_build("arm64", "centos7")
+                }
+                stage("arm64 test") {
+                    run_test("arm64", "centos7")
+                }
             },
     )
 } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
