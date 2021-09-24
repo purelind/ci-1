@@ -26,11 +26,11 @@ TIDB_BRANCH = RELEASE_BRANCH
 TIDB_TOOLS_BRANCH = RELEASE_BRANCH
 
 
-if (params.containsKey("release_test") && params.triggered_by_upstream_ci == null) {
-    TIKV_BRANCH = params.release_test__tikv_commit
-    PD_BRANCH = params.release_test__pd_commit
-    TIDB_BRANCH = params.release_test_tidb_commit
-}
+//if (params.containsKey("release_test") && params.triggered_by_upstream_ci == null) {
+//    TIKV_BRANCH = params.release_test__tikv_commit
+//    PD_BRANCH = params.release_test__pd_commit
+//    TIDB_BRANCH = params.release_test_tidb_commit
+//}
 
 K8S_NAMESPACE = "jenkins-tidb"
 BRANCH_NEED_GO1160 = ["master", "release-5.1"]

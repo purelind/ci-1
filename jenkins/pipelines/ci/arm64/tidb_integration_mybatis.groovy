@@ -121,7 +121,7 @@ __EOF__
 
                 try {
                     dir("mybatis3") {
-                        timeout(10) {
+                        timeout(30) {
                             sh """
                             curl -L ${MYBATIS3_URL} -o travis-tidb.zip && unzip travis-tidb.zip && rm -rf travis-tidb.zip
                             cp -R mybatis-3-travis-tidb/. ./ && rm -rf mybatis-3-travis-tidb
