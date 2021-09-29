@@ -48,22 +48,53 @@ node("ci-admin-utils") {
                     cp -R ${entry.value} ./ && [ -d ${entry.key}/.git ]
                 """
                 dir("${entry.key}") {
+                    GIT_ORIGIN_URL = sh (
+                            script: 'git config --get remote.origin.url',
+                            returnStdout: true
+                    ).trim()
+                    GIT_DEFAULT_BRANCH = sh (
+                            script: 'git remote show origin | grep "HEAD branch" | cut -d ":" -f 2\n',
+                            returnStdout: true
+                    ).trim()
+
+                    echo "Git origin url: ${GIT_ORIGIN_URL}"
+                    echo "Git default branch: ${GIT_DEFAULT_BRANCH}"
                     if (entry.key in ["tiflash", "tics"] ) {
-                        checkout changelog: false, poll: true,
-                                scm: [$class                           : 'GitSCM',
-                                      branches                         : [[name: '*/master']],
-                                      doGenerateSubmoduleConfigurations: false,
-                                      extensions                       : [[$class: 'PruneStaleBranch'],
-                                                                          [$class: 'CleanBeforeCheckout']],
-                                      submoduleCfg                     : [],
-                                      userRemoteConfigs                : [[credentialsId: 'github-sre-bot-ssh',
-                                                                           refspec      : '+refs/heads/*:refs/remotes/origin/*',
-                                                                           url          : "git@github.com:pingcap/${entry.key}.git"]]]
+                        checkout([$class: 'GitSCM',
+                                  branches: [[name: '*/master']],
+                                  doGenerateSubmoduleConfigurations: false,
+                                  extensions: [
+                                          [$class             : 'SubmoduleOption',
+                                           disableSubmodules  : false,
+                                           parentCredentials  : true,
+                                           recursiveSubmodules: true,
+                                           trackingSubmodules : false,
+                                           reference          : ''],
+                                          [$class: 'PruneStaleBranch'],
+                                          [$class: 'CleanBeforeCheckout'],
+                                  ],
+                                  submoduleCfg: [],
+                                  userRemoteConfigs: [[credentialsId: 'github-sre-bot-ssh',
+                                                       refspec: '+refs/heads/*:refs/remotes/origin/*',
+                                                       url: "git@github.com:pingcap/${entry.key}.git"]]])
                     } else {
-                        sh """
-                        pwd
-                        rm -f ./git/index.lock &&  git clean -fnd && git checkout . && git pull --all
-                        """
+                        if (GIT_ORIGIN_URL.startsWith("git")) {
+                            checkout changelog: false, poll: true,
+                                    scm: [$class                           : 'GitSCM',
+                                          branches                         : [[name: '*/master']],
+                                          doGenerateSubmoduleConfigurations: false,
+                                          extensions                       : [[$class: 'PruneStaleBranch'],
+                                                                              [$class: 'CleanBeforeCheckout']],
+                                          submoduleCfg                     : [],
+                                          userRemoteConfigs                : [[credentialsId: 'github-sre-bot-ssh',
+                                                                               refspec      : '+refs/heads/*:refs/remotes/origin/*',
+                                                                               url          : "git@github.com:pingcap/${entry.key}.git"]]]
+                        } else {
+                            sh """
+                            pwd
+                            rm -f ./git/index.lock && git clean -fnd && git checkout . && git checkout ${GIT_DEFAULT_BRANCH}  && git pull --all
+                            """
+                        }
                     }
                 }
                 dir("${entry.key}@tmp") {
