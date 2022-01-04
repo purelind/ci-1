@@ -12,6 +12,37 @@ if (params.containsKey("release_test")) {
 def BUILD_NUMBER = "${env.BUILD_NUMBER}"
 def tidb_url = "${FILE_SERVER_URL}/download/builds/pingcap/tidb/pr/${ghprbActualCommit}/centos7/tidb-server.tar.gz"
 
+@NonCPS // has to be NonCPS or the build breaks on the call to .each
+def parseBuildResult(list) {
+    def total_test = 0
+    def failed_test = 0
+    def success_test = 0
+
+    list.each { item ->
+        echo "${item}"
+        if (item.status == "success") {
+            success_test += 1
+        } else {
+            failed_test += 1
+        }
+    }
+    total_test = success_test + failed_test
+
+    println "total_test: ${total_test}"
+    println "success_test: ${success_test}"
+    println "failed_test: ${failed_test}"
+
+    def resp_str = ""
+    if (failed_test > 0) {
+        resp_str = "failed ${failed_test}, success ${success_test}, total ${total_test}"
+    } else {
+        resp_str = "all ${total_test} tests passed"
+    }
+
+    return resp_str      
+}
+
+
 string trimPrefix = {
         it.startsWith('release-') ? it.minus('release-').split("-")[0] : it
     }
@@ -77,12 +108,9 @@ node("${GO_TEST_SLAVE}") {
             if (file_existed == 0) {
                 sh "curl -O ${triggered_job_result_file_url}"
                 def jsonObj = readJSON file: "result-${triggered_job_name}_${result.getNumber().toString()}.json"
-                def json = groovy.json.JsonOutput.toJson(jsonObj)
-                println "all_results: ${json}"
-                currentBuild.description = "${json}"
-                writeJSON file: 'ciResult.json', json: json, pretty: 4
-                sh 'cat ciResult.json'
-                archiveArtifacts artifacts: 'ciResult.json', fingerprint: true
+                summary_info = parseBuildResult(jsonObj)
+                currentBuild.description = summary_info
+                archiveArtifacts artifacts: 'result-${triggered_job_name}_${result.getNumber().toString()}.json', fingerprint: true
             } else {
                 println "triggered job result file not exist"
             }
