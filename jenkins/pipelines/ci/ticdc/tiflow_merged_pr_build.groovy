@@ -131,7 +131,7 @@ try {
                             }
                         }
                         ticdc_dockerfile = "https://raw.githubusercontent.com/PingCAP-QE/ci/main/jenkins/Dockerfile/release/linux-amd64/ticdc"
-                        ticdc_image = "hub.pingcap.net/qa/ticdc:${ghprbTargetBranch}"
+                        ticdc_image = "hub.pingcap.net/qa/ticdc:${ghprbActualCommit}"
                         def paramsDocker = [
                                 string(name: "ARCH", value: "amd64"),
                                 string(name: "OS", value: "linux"),

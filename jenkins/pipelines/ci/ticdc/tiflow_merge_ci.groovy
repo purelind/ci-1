@@ -106,6 +106,7 @@ node("github-status-updater") {
                 booleanParam(name: 'update_commit_status', value: true),
                 string(name: 'release_test__release_branch', value: TIFLOW_BRANCH),
                 string(name: 'release_test__cdc_commit', value: TIFLOW_COMMIT_ID),
+                string(name: 'release_test__comment_body', value: "tidb=master pd=master tikv=master tiflash=master"),
         ]
 
         echo("default params: ${default_params}")
@@ -116,9 +117,9 @@ node("github-status-updater") {
     def triggered_job_result = []
 
     try {
-        stage("Build") {
-            build(job: "tiflow_merged_pr_build", parameters: default_params, wait: true, propagate: true)
-        }
+        // stage("Build") {
+        //     build(job: "tiflow_merged_pr_build", parameters: default_params, wait: true, propagate: true)
+        // }
         stage("Trigger Test Job") {
             container("github-status-updater") {
                 parallel(
@@ -134,6 +135,13 @@ node("github-status-updater") {
                             triggered_job_result << ["name": "cdc_ghpr_kafka_integration_test", "type": "tiflow-merge-ci-checker" , "result": result]
                             if (result.getResult() != "SUCCESS") {
                                 throw new Exception("cdc_ghpr_kafka_integration_test failed")
+                            }
+                        },
+                        cdc_ghpr_leak_test: {
+                            def result = build(job: "cdc_ghpr_leak_test", parameters: default_params, wait: true, propagate: false)
+                            triggered_job_result << ["name": "cdc_ghpr_leak_test", "type": "tiflow-merge-ci-checker" , "result": result]
+                            if (result.getResult() != "SUCCESS") {
+                                throw new Exception("cdc_ghpr_leak_test failed")
                             }
                         },
                         tiflow_merged_pr_ut: {

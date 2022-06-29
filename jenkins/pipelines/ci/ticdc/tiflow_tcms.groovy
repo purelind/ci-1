@@ -73,7 +73,7 @@ def check_plan_status(plan_id) {
                     println "error ${still_running}"
                 } else {
                     println "sleep ${still_running}"
-                    sleep(time: 5, unit: 'SECONDS')
+                    sleep(time: 60, unit: 'SECONDS')
                 }
                 println "still running ${still_running}"
 
@@ -131,22 +131,23 @@ podTemplate(label: label,
     node(label) {
         println "debug command:\nkubectl -n ${namespace} exec -ti ${NODE_NAME} bash"
         container("golang") {
+            println "${ghprbTargetBranch}"
             stage("prepare") {
                 sh """
+                feature_branch=${ghprbActualCommit}
                 curl -LO http://fileserver.pingcap.net/download/cicd/ticdc-feature-branch/cdc_boundary_test_sync.yaml
-                sed -i -e 's|TICDC_FEATURE_BRANCH_VERSION|${ghprbTargetBranch}|g' cdc_boundary_test_sync.yaml
+                sed -i -e "s|TICDC_FEATURE_BRANCH_VERSION|\${feature_branch}|g" cdc_boundary_test_sync.yaml
                 curl http://fileserver.pingcap.net/download/pingcap/qa/test-infra/tcctl-install.sh | bash
                 tcctl config --token tcmsp_JFUYWuanEIeYMxmoWLGj --rms-host 'http://rms-staging.pingcap.net:30007'
-                tcctl run -f cdc_boundary_test_sync.yaml | tee cdc_boundary_test_sync.log
-                # test_plan_id=$(cat cdc_boundary_test_sync.log | grep https | cut -d ' ' -f14 | cut -d '/' -f7)
-
+                tcctl run -f cdc_boundary_test_sync.yaml 2>&1  | tee cdc_boundary_test_sync.log
                 """
-                TEST_PLAN_ID = sh(script: "cat cdc_boundary_test_sync.log | grep https | cut -d ' ' -f14 | cut -d '/' -f7", returnStdout: true).trim()
+                TEST_PLAN_ID = sh(script: "cat cdc_boundary_test_sync.log | grep https | awk -F \" \" '{print \$(NF-3)}' | awk -F \"/\" '{print \$NF}'", returnStdout: true).trim()
                 // TEST_PLAN_ID = "870090"
                 println "test plan id: ${TEST_PLAN_ID}"
                 if (TEST_PLAN_ID == "") {
                     echo "test plan id is empty"
-                    exit 1
+                    throw new Exception("test plan id is empty")
+
                 }
                 test_result = check_plan_status(TEST_PLAN_ID)
                 if (test_result) {
