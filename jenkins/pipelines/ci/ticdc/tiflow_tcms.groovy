@@ -29,6 +29,21 @@ properties([
                         defaultValue: '',
                         name: 'ghprbPullTitle',
                         trim: true
+                ),
+                string(
+                        defaultValue: 'master',
+                        name: 'TIDB_IMAGE_TAG',
+                        trim: true,
+                ),
+                string(
+                        defaultValue: 'master',
+                        name: 'TIKV_IMAGE_TAG',
+                        trim: true
+                ),
+                string(
+                        defaultValue: 'master',
+                        name: 'PD_IMAGE_TAG',
+                        trim: true
                 )
         ])
 ])
@@ -44,14 +59,20 @@ if (params.containsKey("release_test")) {
     ghprbPullDescription = "release-test"
 }
 
+println "${ghprbTargetBranch}"
+println "${ghprbActualCommit}"
+println "pd image tag : ${PD_IMAGE_TAG}"
+println "tikv image tag : ${TIKV_IMAGE_TAG}"
+println "tidb image tag : ${TIDB_IMAGE_TAG}"
+
 
 
 def check_plan_status(plan_id) {
     success = true
     timeout(time: 120, unit: 'MINUTES') {
         stage("wait for plans execution to end"){
-            finishedStatus = ["\"SUCCESS\"","FAILURE","ERROR"]
-            errorfinishedStatus = ["FAILURE","ERROR"]
+            finishedStatus = ["\"SUCCESS\"","\"FAILURE\"","\"ERROR\""]
+            errorfinishedStatus = ["\"FAILURE\"","\"ERROR\""]
             still_running = "1"
             while (still_running == "1") {
                 status = sh(returnStdout: true,
@@ -131,16 +152,21 @@ podTemplate(label: label,
     node(label) {
         println "debug command:\nkubectl -n ${namespace} exec -ti ${NODE_NAME} bash"
         container("golang") {
-            println "${ghprbTargetBranch}"
             stage("prepare") {
                 sh """
-                feature_branch=${ghprbActualCommit}
                 curl -LO http://fileserver.pingcap.net/download/cicd/ticdc-feature-branch/cdc_boundary_test_sync.yaml
-                sed -i -e "s|TICDC_FEATURE_BRANCH_VERSION|\${feature_branch}|g" cdc_boundary_test_sync.yaml
+
+                sed -i -e "s|TICDC_FEATURE_BRANCH_VERSION|\${ghprbActualCommit}|g" cdc_boundary_test_sync.yaml
+                sed -i -e "s|TIKV_IMAGE_TAG|\${TIKV_IMAGE_TAG}|g" cdc_boundary_test_sync.yaml
+                sed -i -e "s|PD_IMAGE_TAG|\${PD_IMAGE_TAG}|g" cdc_boundary_test_sync.yaml
+                sed -i -e "s|TIDB_IMAGE_TAG|\${TIDB_IMAGE_TAG}|g" cdc_boundary_test_sync.yaml
+
                 curl http://fileserver.pingcap.net/download/pingcap/qa/test-infra/tcctl-install.sh | bash
                 tcctl config --token tcmsp_JFUYWuanEIeYMxmoWLGj --rms-host 'http://rms-staging.pingcap.net:30007'
                 tcctl run -f cdc_boundary_test_sync.yaml 2>&1  | tee cdc_boundary_test_sync.log
                 """
+                archiveArtifacts artifacts: "cdc_boundary_test_sync.yaml", fingerprint: true
+                archiveArtifacts artifacts: "cdc_boundary_test_sync.log", fingerprint: true
                 TEST_PLAN_ID = sh(script: "cat cdc_boundary_test_sync.log | grep https | awk -F \" \" '{print \$(NF-3)}' | awk -F \"/\" '{print \$NF}'", returnStdout: true).trim()
                 // TEST_PLAN_ID = "870090"
                 println "test plan id: ${TEST_PLAN_ID}"

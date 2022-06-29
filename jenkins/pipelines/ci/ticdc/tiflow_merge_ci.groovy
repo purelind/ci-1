@@ -99,6 +99,16 @@ node("github-status-updater") {
 
         echo "COMMIT=${TIFLOW_COMMIT_ID}"
         echo "BRANCH=${TIFLOW_BRANCH}"
+        TIKV_IMAGE_TAG = "master"
+        PD_IMAGE_TAG = "master"
+        TIDB_IMAGE_TAG = "master"
+        if (TIFLOW_BRANCH.startsWith("release-")) {
+            println "this is a release branch"
+            TIKV_IMAGE_TAG = TIFLOW_BRANCH
+            PD_IMAGE_TAG = TIFLOW_BRANCH
+            TIDB_IMAGE_TAG = TIFLOW_BRANCH
+        }
+
 
         default_params = [
                 string(name: 'triggered_by_upstream_ci', value: "tiflow_merge_ci"),
@@ -106,7 +116,11 @@ node("github-status-updater") {
                 booleanParam(name: 'update_commit_status', value: true),
                 string(name: 'release_test__release_branch', value: TIFLOW_BRANCH),
                 string(name: 'release_test__cdc_commit', value: TIFLOW_COMMIT_ID),
-                string(name: 'release_test__comment_body', value: "tidb=master pd=master tikv=master tiflash=master"),
+                string(name: 'release_test__comment_body', value: "tidb=${TIFLOW_BRANCH} pd=${TIFLOW_BRANCH}  tikv=${TIFLOW_BRANCH}  tiflash=${TIFLOW_BRANCH} "),
+                string(name: 'release_test__release_branch', value: TIFLOW_BRANCH),
+                string(name: 'TIKV_IMAGE_TAG', value: TIKV_IMAGE_TAG),
+                string(name: 'PD_IMAGE_TAG', value: PD_IMAGE_TAG),
+                string(name: 'TIDB_IMAGE_TAG', value: TIDB_IMAGE_TAG),
         ]
 
         echo("default params: ${default_params}")
@@ -117,9 +131,9 @@ node("github-status-updater") {
     def triggered_job_result = []
 
     try {
-        // stage("Build") {
-        //     build(job: "tiflow_merged_pr_build", parameters: default_params, wait: true, propagate: true)
-        // }
+        stage("Build") {
+            build(job: "tiflow_merged_pr_build", parameters: default_params, wait: true, propagate: true)
+        }
         stage("Trigger Test Job") {
             container("github-status-updater") {
                 parallel(

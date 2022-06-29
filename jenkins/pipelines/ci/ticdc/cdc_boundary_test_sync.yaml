@@ -29,7 +29,7 @@ testbed:
           cpu: 2000m
           memory: 8Gi
         baseImage: hub.pingcap.net/qa/pd
-        version: master
+        version: "PD_IMAGE_TAG"
       tikv:
         storageClassName: fast-disks
         replicas: 3
@@ -40,7 +40,7 @@ testbed:
           cpu: 8000m
           memory: 16Gi
         baseImage: hub.pingcap.net/qa/tikv
-        version: master
+        version: "TIKV_IMAGE_TAG"
       tidb:
         replicas: 1
         requests:
@@ -50,7 +50,7 @@ testbed:
           cpu: 8000m
           memory: 16Gi
         baseImage: hub.pingcap.net/qa/tidb
-        version: master
+        version: "TIDB_IMAGE_TAG"
       ticdc:
         replicas: 3
         requests:
