@@ -148,15 +148,17 @@ pipeline {
                                 cache(path: "./", filter: '**/*', key: "ws/${BUILD_TAG}/tiflow") {
                                     sh 'chmod +x ../scripts/pingcap/tiflow/*.sh'
                                     sh "${WORKSPACE}/scripts/pingcap/tiflow/ticdc_integration_test_download_dependency.sh master master master master http://fileserver.pingcap.net"
-                                    sh label: "Case ${CASES}", script: """
+                                    sh label: "init prepare for test", script: """
                                     mv third_bin/* bin/ && ls -alh bin/
                                     rm -rf /tmp/tidb_cdc_test
                                     mkdir -p /tmp/tidb_cdc_test
                                     cp ../tidb/bin/tidb-server ./bin/
                                     ./bin/tidb-server -V
                                     ls -alh ./bin/
+                                    """ 
+                                    sh label: "Case ${CASES}", script: """
                                     make integration_test_mysql CASE="${CASES}"
-                                    """             
+                                    """          
                                 }
                             }
                         }
