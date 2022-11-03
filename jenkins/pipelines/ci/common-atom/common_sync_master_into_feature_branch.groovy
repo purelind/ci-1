@@ -7,7 +7,7 @@ properties([
         ]),
         pipelineTriggers([
                 parameterizedCron('''
-                0 12 * * * % ORG_AND_REPO=purelind/test-ci;FEATURE_BRANCH=cool_feature;FEISHU_WEBHOOK_ID=test-cd-feishu-webhook
+                0 12 * * * % ORG_AND_REPO=pingcap/tidb;FEATURE_BRANCH=feature/distribute-reorg;FEISHU_WEBHOOK_ID=tidb-sync-master-distribute-reorg-webhook
             ''')
         ])
 ])
