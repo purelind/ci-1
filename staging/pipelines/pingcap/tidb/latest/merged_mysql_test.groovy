@@ -106,10 +106,10 @@ pipeline {
                     }
                 }
                 dir("tidb-test") {
-                    cache(path: "./", filter: '**/*', key: "git/pingcap/tidb-test/rev-${ghprbActualCommit}", restoreKeys: ['git/pingcap/tidb-test/rev-']) {
+                    cache(path: "./", filter: '**/*', key: "git/pingcap/tidb-test/rev-${GIT_COMMIT}", restoreKeys: ['git/pingcap/tidb-test/rev-']) {
                         retry(2) {
                             script {
-                                component.checkout('git@github.com:pingcap/tidb-test.git', 'tidb-test', ghprbTargetBranch, ghprbCommentBody, GIT_CREDENTIALS_ID)
+                                component.checkout('git@github.com:pingcap/tidb-test.git', 'tidb-test', GIT_BRANCH, "", GIT_CREDENTIALS_ID)
                             }
                         }
                     }
@@ -121,18 +121,16 @@ pipeline {
                 dir('tidb') {
                     sh "git branch && git status"
                     cache(path: "./bin", filter: '**/*', key: "binary/pingcap/tidb/merged_mysql_test/rev-${BUILD_TAG}") {
-                        // FIXME: https://github.com/pingcap/tidb-test/issues/1987
                         sh label: 'tidb-server', script: 'ls bin/tidb-server || make'
                         sh label: 'download binary', script: """
                         chmod +x ${WORKSPACE}/scripts/pingcap/tidb-test/*.sh
-                        ${WORKSPACE}/scripts/pingcap/tidb-test/download_pingcap_artifact.sh --pd=${ghprbTargetBranch} --tikv=${ghprbTargetBranch}
+                        ${WORKSPACE}/scripts/pingcap/tidb-test/download_pingcap_artifact.sh --pd=${GIT_BRANCH} --tikv=${GIT_BRANCH}
                         mv third_bin/* bin/
                         ls -alh bin/
                         """
                     }
                 }
                 dir('tidb-test') {
-                    sh "git branch && git status"
                     cache(path: "./", filter: '**/*', key: "ws/${BUILD_TAG}/tidb-test") {
                         sh 'touch ws-${BUILD_TAG}'
                     }
@@ -178,13 +176,13 @@ pipeline {
                                         """
                                         sh label: "unistore cache_enabled=${CACHE_ENABLED}", script: """
                                             docker run --rm --tty --net=host \
-                                                --user $(id -u):$(id -g) \
+                                                --user \$(id -u):\$(id -g) \
                                                 --env TIDB_SERVER_PATH="/workspace/bin/tidb-server" \
                                                 --env CACHE_ENABLED=${CACHE_ENABLED} \
                                                 --env TIDB_TEST_STORE_NAME="unistore" \
                                                 --ulimit nofile=82920:82920 \
                                                 --ulimit stack=16777216:16777216 \
-                                                --volume "${PWD}:/workspace" \
+                                                --volume "\${PWD}:/workspace" \
                                                 --workdir "/workspace" \
                                                 golang:1.19-bullseye \
                                                 bash ${WORKSPACE}/scripts/pingcap/tidb-test/run-mysql-tests.sh  mysql_test/ 
@@ -212,14 +210,14 @@ pipeline {
                                         """
                                         sh label: "unistore cache_enabled=${CACHE_ENABLED}", script: """
                                             docker run --rm --tty --net=host \
-                                                --user $(id -u):$(id -g) \
+                                                --user \$(id -u):\$(id -g) \
                                                 --env TIDB_SERVER_PATH="/workspace/bin/tidb-server" \
                                                 --env CACHE_ENABLED=${CACHE_ENABLED} \
                                                 --env TIKV_PATH='127.0.0.1:2379' \
                                                 --env TIDB_TEST_STORE_NAME="tikv"\
                                                 --ulimit nofile=82920:82920 \
                                                 --ulimit stack=16777216:16777216 \
-                                                --volume "${PWD}:/workspace" \
+                                                --volume "\${PWD}:/workspace" \
                                                 --workdir "/workspace" \
                                                 golang:1.19-bullseye \
                                                 bash ${WORKSPACE}/scripts/pingcap/tidb-test/run-integration-mysql-tests.sh  mysql_test/ 
