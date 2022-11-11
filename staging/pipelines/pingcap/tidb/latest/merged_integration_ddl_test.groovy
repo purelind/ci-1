@@ -85,7 +85,7 @@ pipeline {
                     cache(path: "./bin", filter: '**/*', key: "binary/pingcap/tidb/merged_integration_ddl_test/rev-${BUILD_TAG}") {
                         container("golang") {
                             sh label: 'tidb-server', script: 'ls bin/tidb-server || make'
-                            sh label: 'ddl-test', script: 'ls bin/ddltest || make make ddltest '
+                            sh label: 'ddl-test', script: 'ls bin/ddltest || make ddltest '
                             sh label: 'download binary', script: """
                             chmod +x ${WORKSPACE}/scripts/pingcap/tidb-test/*.sh
                             ${WORKSPACE}/scripts/pingcap/tidb-test/download_pingcap_artifact.sh --pd=${GIT_BRANCH} --tikv=${GIT_BRANCH}
