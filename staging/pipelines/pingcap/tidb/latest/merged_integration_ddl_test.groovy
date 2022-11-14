@@ -141,10 +141,10 @@ pipeline {
                                             #!/usr/bin/env bash
                                             echo '[storage]\nreserve-space = "0MB"'> tikv_config.toml
                                             bash ${WORKSPACE}/scripts/pingcap/tidb-test/start_tikv.sh
-                                            cp bin/tidb-server ddl_test/ddltest_tidb-server
+                                            cp bin/tidb-server bin/ddltest_tidb-server && ls -alh bin/
                                             export log_level=debug
                                             export DDLTEST_PATH="${WORKSPACE}/tidb-test/bin/ddltest"
-                                            export TIDB_SERVER_PATH="${WORKSPACE}/tidb-test/ddl_test/ddltest_tidb-server"
+                                            export TIDB_SERVER_PATH="${WORKSPACE}/tidb-test/bin/ddltest_tidb-server"
                                             cd ddl_test/ && pwd && ./test.sh -test.run="${DDL_TEST}"
                                         """
                                     }
