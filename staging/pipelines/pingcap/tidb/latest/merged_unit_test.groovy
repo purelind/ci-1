@@ -90,14 +90,13 @@ pipeline {
                             junit(testResults: "**/bazel.xml")
                         }
                         success {
-                            archiveArtifacts artifacts: 'tidb/test_coverage/bazel.xml', fingerprint: true
-                                sh """
-                                cp tidb/coverage.dat tidb/test_coverage/coverage.dat
-                                cd tidb/test_coverage && ls -alh
-                                wget https://uploader.codecov.io/latest/linux/codecov
-                                chmod +x codecov
-                                ./codecov --file coverage.dat --token ${TIDB_CODECOV_TOKEN}
-                                """
+                            sh """
+                            cp tidb/coverage.dat tidb/test_coverage/coverage.dat
+                            cd tidb/test_coverage && ls -alh
+                            wget https://uploader.codecov.io/latest/linux/codecov
+                            chmod +x codecov
+                            ./codecov --file coverage.dat --token ${TIDB_CODECOV_TOKEN}
+                            """
                         }
                     }
                 }
