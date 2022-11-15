@@ -93,7 +93,7 @@ pipeline {
                             sh """
                             cp tidb/coverage.dat tidb/test_coverage/coverage.dat
                             cd tidb/test_coverage && ls -alh
-                            wget https://uploader.codecov.io/latest/linux/codecov
+                            wget -O codecov ${FILE_SERVER_URL}/download/cicd/tools/codecov-v0.3.2
                             chmod +x codecov
                             ./codecov --file ./coverage.dat --token ${TIDB_CODECOV_TOKEN}
                             """
