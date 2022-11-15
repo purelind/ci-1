@@ -93,8 +93,8 @@ pipeline {
                             archiveArtifacts artifacts: 'tidb/test_coverage/bazel.xml', fingerprint: true
                                 sh """
                                 cp tidb/coverage.dat tidb/test_coverage/coverage.dat
-                                cd tidb/test_coverage
-                                curl -Os https://uploader.codecov.io/latest/linux/codecov
+                                cd tidb/test_coverage && ls -alh
+                                wget https://uploader.codecov.io/latest/linux/codecov
                                 chmod +x codecov
                                 ./codecov --file coverage.dat --token ${TIDB_CODECOV_TOKEN}
                                 """
