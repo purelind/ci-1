@@ -95,7 +95,7 @@ pipeline {
                             cd tidb/test_coverage && ls -alh
                             wget https://uploader.codecov.io/latest/linux/codecov
                             chmod +x codecov
-                            ./codecov --file coverage.dat --token ${TIDB_CODECOV_TOKEN}
+                            ./codecov --file ./coverage.dat --token ${TIDB_CODECOV_TOKEN}
                             """
                         }
                     }
