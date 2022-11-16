@@ -47,13 +47,13 @@ pipeline {
             options { timeout(time: 5, unit: 'MINUTES') }
             steps {
                 dir("tidb") {
-                    cache(path: "./", filter: '**/*', key: "git/pingcap/tidb/rev-master", restoreKeys: ['git/pingcap/tidb/rev-']) {
+                    cache(path: "./", filter: '**/*', key: "git/pingcap/tidb/rev-${GIT_COMMIT}", restoreKeys: ['git/pingcap/tidb/rev-']) {
                         retry(2) {
                             checkout(
                                 changelog: false,
                                 poll: false,
                                 scm: [
-                                    $class: 'GitSCM', branches: [[name: "master"]],
+                                    $class: 'GitSCM', branches: [[name: GIT_COMMIT ]],
                                     doGenerateSubmoduleConfigurations: false,
                                     extensions: [
                                         [$class: 'PruneStaleBranch'],
@@ -76,7 +76,7 @@ pipeline {
             stages {
                 stage("Test") {
                     options { timeout(time: 25, unit: 'MINUTES') }
-                    environment {TIDB_CODECOV_TOKEN = credentials('codecov-token-tidb')}
+                    environment { TIDB_CODECOV_TOKEN = credentials('codecov-token-tidb') }
                     steps {
                         dir("tidb") {
                         sh "git status"
@@ -95,7 +95,8 @@ pipeline {
                             cd tidb/test_coverage && ls -alh
                             wget -O codecov ${FILE_SERVER_URL}/download/cicd/tools/codecov-v0.3.2
                             chmod +x codecov
-                            ./codecov --file ./coverage.dat --token ${TIDB_CODECOV_TOKEN}
+                            git status && git rev-parse HEAD
+                            ./codecov --file ./coverage.dat --token ${TIDB_CODECOV_TOKEN} -C ${GIT_COMMIT} -B ${GIT_BRANCH}
                             """
                         }
                     }
