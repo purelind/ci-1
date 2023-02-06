@@ -97,11 +97,6 @@ pipeline {
                 dir("tidb-test") {
                     sh """
                     TIDB_SRC_PATH=${WORKSPACE}/tidb make check
-                    for binCase in {partition_test,coprocessor_test,concurrent-sql}; do
-                        cd \${binCase} && chmod +x build.sh && ./build.sh
-                        cd ..
-                        sleep 5
-                    done
                     """
                 }
             }
