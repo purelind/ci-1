@@ -187,9 +187,9 @@ pipeline {
                     tikv_commit_sha=\$(curl -s ${tikv_sha1_url})
                     pd_commit_sha=\$(curl -s ${pd_sha1_url})
                     tidb_commit_sha=\$(curl -s ${tidb_sha1_url})
-                    tikv_download_url="${FILESERVER_URL}/download/refs/pingcap/tikv/${TARGET_BRANCH}/\${tikv_commit_sha}/centos7/tikv-server.tar.gz"
-                    pd_download_url="${FILESERVER_URL}/download/refs/pingcap/pd/${TARGET_BRANCH}/\${pd_commit_sha}/centos7/pd-server.tar.gz"
-                    tidb_download_url="${FILESERVER_URL}/download/refs/pingcap/tidb/${TARGET_BRANCH}/\${tidb_commit_sha}/centos7/tidb-server.tar.gz"
+                    tikv_download_url="${FILESERVER_URL}/download/refs/pingcap/tikv/\${tikv_commit_sha}/centos7/tikv-server.tar.gz"
+                    pd_download_url="${FILESERVER_URL}/download/refs/pingcap/pd/\${pd_commit_sha}/centos7/pd-server.tar.gz"
+                    tidb_download_url="${FILESERVER_URL}/download/refs/pingcap/tidb/\${tidb_commit_sha}/centos7/tidb-server.tar.gz"
 
                     mkdir -p tmp
                     mkdir -p third_bin
