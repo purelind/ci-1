@@ -179,7 +179,7 @@ pipeline {
                 }
             }
         }
-        stage("Prepare") {
+        stage("Download") {
             steps {
                 dir('download') {
                     // TODO: download binary from fileserver against target branch
