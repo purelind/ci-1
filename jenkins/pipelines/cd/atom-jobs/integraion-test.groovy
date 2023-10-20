@@ -130,7 +130,7 @@ spec:
 
 final K8S_NAMESPACE = "jenkins-tidb"
 final GIT_FULL_REPO_NAME = 'pingcap/tidb'
-final FILESERVER_URL = 'http://fileserver.pingcap.net/'
+final FILESERVER_URL = 'http://fileserver.pingcap.net'
 // final POD_TEMPLATE_FILE = 'pipelines/pingcap/tidb/latest/pod-ghpr_check2.yaml'
 
 final tikv_sha1_url = "${FILESERVER_URL}/download/refs/pingcap/tikv/${TARGET_BRANCH}/sha1"
