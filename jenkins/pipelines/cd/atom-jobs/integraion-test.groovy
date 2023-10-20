@@ -207,34 +207,32 @@ pipeline {
             steps {
                 dir('tidb') {
                     // checkout tidb src code as target branch
-                    cache(path: "./", filter: '**/*', key: prow.getCacheKey('git', REFS), restoreKeys: prow.getRestoreKeys('git', REFS)) {
-                        retry(2) {
-                            script {
-                                checkout(
-                                    changelog: false,
-                                    poll: true,
-                                    scm: [
-                                        $class: 'GitSCM',
-                                        branches: [[name: TARGET_BRANCH]],
-                                        doGenerateSubmoduleConfigurations: false,
-                                        extensions: [
-                                            [$class: 'PruneStaleBranch'],
-                                            [$class: 'CleanBeforeCheckout'],
-                                            [$class: 'CloneOption', timeout: 10],
-                                        ], 
-                                        submoduleCfg: [],
-                                        userRemoteConfigs: [[
-                                            credentialsId: "",
-                                            refspec: "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH",
-                                            url: "https://github.com/pingcap/tidb.git",
-                                        ]]
-                                    ]
-                                )
-                                sh label: "checkout tidb code", script: """
-                                    git checkout ${TARGET_BRANCH}
-                                    git checkout ${tidb_commit_sha}
-                                """
-                            }
+                    retry(2) {
+                        script {
+                            checkout(
+                                changelog: false,
+                                poll: true,
+                                scm: [
+                                    $class: 'GitSCM',
+                                    branches: [[name: TARGET_BRANCH]],
+                                    doGenerateSubmoduleConfigurations: false,
+                                    extensions: [
+                                        [$class: 'PruneStaleBranch'],
+                                        [$class: 'CleanBeforeCheckout'],
+                                        [$class: 'CloneOption', timeout: 10],
+                                    ], 
+                                    submoduleCfg: [],
+                                    userRemoteConfigs: [[
+                                        credentialsId: "",
+                                        refspec: "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH",
+                                        url: "https://github.com/pingcap/tidb.git",
+                                    ]]
+                                ]
+                            )
+                            sh label: "checkout tidb code", script: """
+                                git checkout ${TARGET_BRANCH}
+                                git checkout ${tidb_commit_sha}
+                            """
                         }
                     }
                 }
