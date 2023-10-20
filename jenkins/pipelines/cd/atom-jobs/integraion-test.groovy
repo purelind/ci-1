@@ -339,9 +339,9 @@ pipeline {
             """
         }
 
-        failure {
-            // Send lark notification
+        // failure {
+        //     // Send lark notification
             
-        }
+        // }
     }
 }
