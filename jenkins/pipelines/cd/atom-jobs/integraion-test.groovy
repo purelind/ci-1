@@ -183,13 +183,15 @@ pipeline {
             steps {
                 dir('download') {
                     // TODO: download binary from fileserver against target branch
+                    script {
+                      tikv_commit_sha = sh(returnStdout: true, script: "curl ${tikv_sha1_url}").trim()
+                      pd_commit_sha = sh(returnStdout: true, script: "curl ${pd_sha1_url}").trim()
+                      tidb_commit_sha = sh(returnStdout: true, script: "curl ${tidb_sha1_url}").trim()
+                    }
                     sh """
-                    tikv_commit_sha=\$(curl -s ${tikv_sha1_url})
-                    pd_commit_sha=\$(curl -s ${pd_sha1_url})
-                    tidb_commit_sha=\$(curl -s ${tidb_sha1_url})
-                    tikv_download_url="${FILESERVER_URL}/download/builds/pingcap/tikv/\${tikv_commit_sha}/centos7/tikv-server.tar.gz"
-                    pd_download_url="${FILESERVER_URL}/download/builds/pingcap/pd/\${pd_commit_sha}/centos7/pd-server.tar.gz"
-                    tidb_download_url="${FILESERVER_URL}/download/builds/pingcap/tidb/\${tidb_commit_sha}/centos7/tidb-server.tar.gz"
+                    tikv_download_url="${FILESERVER_URL}/download/builds/pingcap/tikv/${tikv_commit_sha}/centos7/tikv-server.tar.gz"
+                    pd_download_url="${FILESERVER_URL}/download/builds/pingcap/pd/${pd_commit_sha}/centos7/pd-server.tar.gz"
+                    # tidb_download_url="${FILESERVER_URL}/download/builds/pingcap/tidb/${tidb_commit_sha}/centos7/tidb-server.tar.gz"
 
                     mkdir -p tmp
                     mkdir -p third_bin
@@ -240,22 +242,22 @@ pipeline {
         }
         stage("Prepare") {
             steps {
-                cache(path: "./", filter: '**/*', key: "ws/${BUILD_TAG}") { 
-                    dir('tidb') {
-                        // TODO: download binary from fileserver against target branch
-                        sh """
-                        make
-                        """
-                        sh label: "prepare all binaries", script: """
-                        touch rev-${tidb_commit_sha}
-                        cp -f ../download/third_bin/* bin/
-                        chmod +x bin/*
-                        ./bin/tidb-server -V
-                        ./bin/pd-server -V
-                        ./bin/tikv-server -V
-                        """
-                    }
-                }
+                  dir('tidb') {
+                      // TODO: download binary from fileserver against target branch
+                      sh """
+                      make
+                      cp bin/tidb-server bin/integration_test_tidb-server
+                      """
+                      sh label: "prepare all binaries", script: """
+                      touch rev-${tidb_commit_sha}
+                      cp -f ../download/third_bin/* bin/
+                      chmod +x bin/*
+                      ./bin/tidb-server -V
+                      ./bin/pd-server -V
+                      ./bin/tikv-server -V
+                      """
+                  }
+                  stash name: 'ws', includes: 'tidb/**/*'
             }
         }
         stage('Checks') {
@@ -291,10 +293,12 @@ pipeline {
                     stage('Test')  {
                         options { timeout(time: 60, unit: 'MINUTES') }
                         steps {
+                            unstash 'ws'
                             dir('tidb') {
-                                cache(path: "./", filter: '**/*', key: "ws/${BUILD_TAG}") {
-                                    sh "ls -l rev-${tidb_commit_sha}" // will fail when not found in cache or no cached.
-                                }
+                                // cache(path: "./", filter: '**/*', key: "ws/${BUILD_TAG}") {
+                                //     sh "ls -l rev-${tidb_commit_sha}" // will fail when not found in cache or no cached.
+                                // }
+                                sh "ls -l rev-${tidb_commit_sha}"
                                 sh 'chmod +x ../scripts/pingcap/tidb/*.sh'
                                 sh """
                                 sed -i 's|repository_cache=/home/jenkins/.tidb/tmp|repository_cache=/share/.cache/bazel-repository-cache|g' Makefile.common
@@ -313,8 +317,13 @@ pipeline {
                             }
                             failure {
                                 // TODO 修正收集日志的路径，目前这里存在问题，收集不到正确的路径
-                                dir("dir") {
-                                    archiveArtifacts(artifacts: 'pd*.log, tikv*.log, integration-test.out', allowEmptyArchive: true)
+                                dir("tidb") {
+                                    sh """
+                                    find . -name "pd*.log" -type f -exec tail '{}' +
+                                    find . -name "tikv*.log" -type f -exec tail '{}' +
+                                    find . -name "*.out" -type f -exec tail '{}' +
+                                    """
+                                    archiveArtifacts(artifacts: 'pd*.log, tikv*.log, tests/integrationtest/integration-test.out', allowEmptyArchive: true)
                                 }
                             }
                         }
