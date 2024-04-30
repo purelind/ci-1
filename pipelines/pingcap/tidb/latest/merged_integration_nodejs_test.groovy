@@ -114,8 +114,9 @@ pipeline {
                                         ./bin/pd-server -V
                                         ./bin/tikv-server -V
                                         ./bin/tidb-server -V
+                                        printenv
                                     """
-                                    sh label: "${TEST_DIR} ", script: """#!/usr/bin/env bash
+                                    sh label: "${TEST_DIR}", script: """#!/usr/bin/env bash
                                         export TIDB_SERVER_PATH="\$(pwd)/bin/tidb-server"
                                         export TIDB_TEST_STORE_NAME="tikv"
                                         echo '[storage]\nreserve-space = "0MB"'> tikv_config.toml
