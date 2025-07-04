@@ -31,6 +31,10 @@ presubmits:
                 echo "Rust version: $(rustc --version)"
                 echo "Cargo version: $(cargo --version)"
 
+                unset RUSTUP_DIST_SERVER
+                unset RUSTUP_UPDATE_ROOT
+                env
+
                 # Build and verify
                 make meta_server && ./target/debug/meta_service_server --version
                 make worker_server && ./target/debug/worker_node_server --version
@@ -58,6 +62,10 @@ presubmits:
             args:
               - |
                 set -ex
+                unset RUSTUP_DIST_SERVER
+                unset RUSTUP_UPDATE_ROOT
+                env
+                
                 echo "Preparing test assets..."
                 mkdir -p /cache
                 wget -qO - https://quickwit-datasets-public.s3.amazonaws.com/hdfs-logs-multitenants.json.gz | gzip -d - > /cache/hdfs-logs-multitenants.json
